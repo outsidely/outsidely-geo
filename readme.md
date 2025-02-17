@@ -38,6 +38,7 @@ Objects should be in the array ordered by timestamp.
     "distance": 14361.84244,
     "ascent": 588.402,
     "descent": 570.111
+}
 ```
 
 ## Table Service Approach
