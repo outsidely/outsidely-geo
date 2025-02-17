@@ -23,8 +23,8 @@ Objects should be in the array ordered by timestamp.
 ```
 
 ### statisticsModel
-- **time** - number - Total time elapsed for the activity in seconds
-- **distance** - number - Total length of the activity in meters
+- **time** - number - required - Total time elapsed for the activity in seconds
+- **distance** - number - required - Total length of the activity in meters
 - **ascent** - number - Total ascent of the activity in meters
 ```javascript
 {
