@@ -46,39 +46,39 @@ Objects should be in the array ordered by timestamp.
 ### Users
 - PartitionKey `userId`
 - RowKey `account`
-- Email
-- First name
-- Last name
-- Time zone
-- Avatar
+    - Email
+    - First name
+    - Last name
+    - Time zone
+    - Avatar
 
 ### Activities
 - PartitionKey `userId`
 - RowKey `activityId`
-- Name
-- Description
-- Source File
-- Preview Image (png)
-- Activity Type (GPS: Run Bike,Non-GPS: Workout)
-- Timestamp
-- Time (s)
-- Distance (m)
-- Ascent (m)
-- Descent (m)
-- Future
-    - Moving Time (s)
-    - Average Moving Speed (m/s)
+    - Name
+    - Description
+    - Source File
+    - Preview Image (png)
+    - Activity Type (GPS: Run Bike,Non-GPS: Workout)
+    - Timestamp
+    - Time (s)
+    - Distance (m)
+    - Ascent (m)
+    - Descent (m)
+    - Future
+        - Moving Time (s)
+        - Average Moving Speed (m/s)
 
 ### Comments
 - PartitionKey `activityId`
 - RowKey `commentId`
-- `userId`
-- Comment
+    - `userId`
+    - Comment
 
 ### Photos
 - PartitionKey `activityId`
 - RowKey `photoId`
-- Path
+    - Path
 
 ## Blob Storage Approach
 

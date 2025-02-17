@@ -1,4 +1,15 @@
 #https://learn.microsoft.com/en-us/python/api/azure-functions/azure.functions?view=azure-python
+#  reference
+
+#https://stackoverflow.com/questions/47068504/where-to-find-python-implementation-of-chaikins-corner-cutting-algorithm
+#  useful for smoothing distance
+
+#https://en.wikipedia.org/wiki/Spline_interpolation
+#  useful for smoothing elevation
+
+#https://fitdecode.readthedocs.io/en/latest/
+#  useful for reading fit files
+
 import azure.functions as func
 import logging
 import geopandas
@@ -82,9 +93,6 @@ def uploadActivity(req: func.HttpRequest) -> func.HttpResponse:
             geojson_out = BytesIO()
             pyogrio.write_dataframe(data_frame, geojson_out, driver="GeoJSON", layer="track_points")
             return func.HttpResponse(geojson_out.getvalue(), status_code=200, mimetype="application/geo+json")
-        #https://fitdecode.readthedocs.io/en/latest/
-        # if (req.headers["Content-Type"] == "application/vnd.ant.fit "):
-        #    fit = True
         else:
             return createJsonHttpResponse(415, "Unsupported Content-Type")
     except:
