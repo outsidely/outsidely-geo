@@ -1,5 +1,7 @@
 # outsidely-geo
 
+GIS and data analysis focused work related to the outsidely project. Utilizes Azure Functions, Azure Table Service, and Azure Blob Storage.
+
 ## Table Service Approach
 
 **Users**
