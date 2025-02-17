@@ -118,7 +118,7 @@ def createStatisticsData(req: func.HttpRequest) -> func.HttpResponse:
             body = req.get_json()
             activityData = parseActivityData(body)
             statisticsData = parseStatisticsData(activityData)
-            return func.HttpResponse(json.dumps(statisticsData), status_code=200, mimetype="image/png")
+            return func.HttpResponse(json.dumps(statisticsData), status_code=200, mimetype="application/json")
         else:
             return createJsonHttpResponse(415, "Unsupported Content-Type")
     except:
