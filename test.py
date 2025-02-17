@@ -1,11 +1,13 @@
-import uuid
-import base58
+import json
 
-uuidvalue = uuid.uuid4()
-print(uuidvalue)
-
-uuidbytes = uuidvalue.bytes
-print(uuidbytes)
-
-b58str_encode = base58.b58encode(uuidbytes).decode()
-print(b58str_encode)
+def createJsonHttpResponse(statusCode, message, properties = {}):
+    
+    response = {}
+    response["statusCode"] = statusCode
+    response["message"] = message
+    for k,v in properties.items():
+        if (k not in ["statusCode", "message"]):
+            raise ValueError("Properties cannot be named statusCode or message")
+        else:
+            response[k] = v
+    return json.dumps(response)

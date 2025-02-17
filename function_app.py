@@ -21,11 +21,22 @@ import json
 from geographiclib.geodesic import Geodesic
 from dateutil import parser
 import math
+import uuid
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
-def createJsonHttpResponse(statusCode, message):
-    return func.HttpResponse('{"statusCode":' + str(statusCode) + ',"message":"' + str(message) + '"}',status_code=statusCode,mimetype="applicaton/json")
+def createJsonHttpResponse(statusCode, message, properties = {}):
+    response = {}
+    response["statusCode"] = statusCode
+    response["message"] = message
+    for k,v in properties.items():
+        if (k not in ["statusCode", "message"]):
+            raise ValueError("Properties cannot be named statusCode or message")
+        else:
+            response[k] = v
+    return func.HttpResponse(json.dumps(response), status_code=statusCode, mimetype="applicaton/json")
 
 # should ensure the output is good: everything has timestamp, longitude, latitude, timestamp is in order, longitude and latitude values are in domain
 def parseActivityData(geojson):
@@ -82,14 +93,14 @@ def parseStatisticsData(activityData):
 
     return statisticsData
 
-#curl "http://localhost:7071/api/uploadActivity" -H "Content-Type: application/gpx+xml" -d "@/home/jesse/Desktop/test.gpx" --output "/home/jesse/Desktop/test.geojson"
-@app.route(route="uploadActivity")
-def uploadActivity(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('called uploadActivity')
+#curl "http://localhost:7071/api/uploadActivityTest" -H "Content-Type: application/gpx+xml" -d "@/home/jesse/Desktop/test.gpx" --output "/home/jesse/Desktop/test.geojson"
+@app.route(route="uploadActivityTest")
+def uploadActivityTest(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('called uploadActivityTest')
     try:
         if (req.headers["Content-Type"] == "application/gpx+xml"):
             request_body = BytesIO(req.get_body())
-            data_frame = pyogrio.read_dataframe(request_body, driver="GPX", layer="track_points")
+            data_frame = pyogrio.read_dataframe(request_body, layer="track_points")
             geojson_out = BytesIO()
             pyogrio.write_dataframe(data_frame, geojson_out, driver="GeoJSON", layer="track_points")
             return func.HttpResponse(geojson_out.getvalue(), status_code=200, mimetype="application/geo+json")
@@ -132,6 +143,53 @@ def createStatisticsData(req: func.HttpRequest) -> func.HttpResponse:
             activityData = parseActivityData(body)
             statisticsData = parseStatisticsData(activityData)
             return func.HttpResponse(json.dumps(statisticsData), status_code=200, mimetype="application/json")
+        else:
+            return createJsonHttpResponse(415, "Unsupported Content-Type")
+    except:
+        return createJsonHttpResponse(500, "Backend Error")
+    
+#curl "http://localhost:7071/api/uploadActivity" -H "Content-Type: application/gpx+xml" -d "@/home/jesse/Desktop/test.gpx" --output -
+@app.route(route="uploadActivity", methods=[func.HttpMethod.POST])
+def uploadActivity(req: func.HttpRequest) -> func.HttpResponse:
+
+    logging.info('called uploadActivity')
+
+    activityId = str(uuid.uuid4())
+
+    try:
+        if (req.headers["Content-Type"] == "application/gpx+xml"):
+
+            # convert to geojson
+            request_body = BytesIO(req.get_body())
+            data_frame = pyogrio.read_dataframe(request_body, layer="track_points")
+            geojson_out = BytesIO()
+            pyogrio.write_dataframe(data_frame, geojson_out, driver="GeoJSON", layer="track_points")
+            #return func.HttpResponse(geojson_out.getvalue(), status_code=200, mimetype="application/geo+json")
+
+            # convert to activityModel
+            activityData = parseActivityData(json.loads(geojson_out.getvalue().decode()))
+            
+            # calculate statistics
+            statisticsData = parseStatisticsData(activityData)
+
+            # create static map
+            points = []
+            for point in activityData:
+                points.append([point["longitude"],point["latitude"]])
+            simplified = json.loads(geopandas.GeoSeries([LineString(points)]).simplify(.0001).to_json())
+            m = StaticMap(360, 360, padding_x=10, padding_y=10, url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
+            m.add_line(Line(simplified["features"][0]["geometry"]["coordinates"], 'red', 3))
+            response_data = BytesIO()
+            image = m.render()
+            image.save(response_data, format="png")
+
+            # save file, geojson, activitymodel to storage container
+
+            # save statistics + staticmap to tblsvc
+            
+            # return 
+            return createJsonHttpResponse(200, "Successfully processed activity", {"activityId": activityId})
+        
         else:
             return createJsonHttpResponse(415, "Unsupported Content-Type")
     except:

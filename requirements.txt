@@ -9,3 +9,5 @@ staticmap
 shapely
 pyproj
 geographiclib
+azure-storage-blob
+azure-identity
