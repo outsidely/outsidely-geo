@@ -73,7 +73,7 @@ def uploadActivity(req: func.HttpRequest) -> func.HttpResponse:
     try:
         if (req.headers["Content-Type"] == "application/gpx+xml"):
             request_body = BytesIO(req.get_body())
-            data_frame = pyogrio.read_dataframe(request_body, drive="GPX", layer="track_points")
+            data_frame = pyogrio.read_dataframe(request_body, driver="GPX", layer="track_points")
             geojson_out = BytesIO()
             pyogrio.write_dataframe(data_frame, geojson_out, driver="GeoJSON", layer="track_points")
             return func.HttpResponse(geojson_out.getvalue(), status_code=200, mimetype="application/geo+json")
