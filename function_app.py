@@ -16,21 +16,28 @@ app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 def createJsonHttpResponse(statusCode, message):
     return func.HttpResponse('{"statusCode":' + str(statusCode) + ',"message":"' + str(message) + '"}',status_code=statusCode,mimetype="applicaton/json")
 
-# activity data should be in a GeoJSON format with a FeatureCollection of Features with geometry type of Points
-# additional info will be pulled from the properties of the Feature such as time, elevation, and more
+# should ensure the output is good: everything has timestamp, longitude, latitude, timestamp is in order, longitude and latitude values are in domain
 def parseActivityData(geojson):
     activityData = []
+    prior_timestamp = ""
     for feature in geojson["features"]:
         if feature["geometry"]["type"] == "Point":
             properties = {}
-            if (feature["properties"]["time"]):
-                properties["timestamp"] = feature["properties"]["time"]
-            if (feature["properties"]["ele"]):
+            if prior_timestamp != "" and parser.parse(prior_timestamp) > parser.parse(feature["properties"]["time"]):
+                raise ValueError("Error: Detected out of order timestamp data")
+            try:
+                if (feature["properties"]["time"]):
+                    properties["timestamp"] = feature["properties"]["time"]
+                if (feature["geometry"]["coordinates"][0]):
+                    properties["longitude"] = feature["geometry"]["coordinates"][0]
+                if (feature["geometry"]["coordinates"][1]):
+                    properties["latitude"] = feature["geometry"]["coordinates"][1]
+            except:
+                raise ValueError("Could not parse timestamp, longitude, or latitude which are required")
+            try:
                 properties["elevation"] = feature["properties"]["ele"]
-            if (feature["geometry"]["coordinates"][0]):
-                properties["longitude"] = feature["geometry"]["coordinates"][0]
-            if (feature["geometry"]["coordinates"][1]):
-                properties["latitude"] = feature["geometry"]["coordinates"][1]
+            except:
+                ex = True
             activityData.append(properties)
     return activityData
 
@@ -47,8 +54,6 @@ def parseStatisticsData(activityData):
     descent = 0.0
 
     for i in range(len(activityData)-1):
-        if parser.parse(activityData[0]["timestamp"]) > parser.parse(activityData[len(activityData)-1]["timestamp"]):
-            raise ValueError("Error: Detected out of order timestamp data")
         x1 = activityData[i]["longitude"]
         y1 = activityData[i]["latitude"]
         x2 = activityData[i+1]["longitude"]
