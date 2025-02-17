@@ -2,25 +2,21 @@
 
 GIS and data analysis focused work related to the outsidely project. Utilizes Azure Functions, Azure Table Service, and Azure Blob Storage.
 
-## Standard Data Models
+## Processing Data Models
 
-### activityModel
-- **timestamp** - string - ISO 8601 formatted, UTC+0
-- **longitude** - number - WGS84 Longitude
-- **latitude** - number - WGS84 Latitude
+### activityDataModel
+Objects should be in the array ordered by timestamp.
+- **timestamp** - string - required - ISO 8601 formatted, UTC+0
+- **longitude** - number - required - WGS84 Longitude
+- **latitude** - number - required - WGS84 Latitude
 - **elevation** - number - Elevation in meters
-- **properties** - object -  containing all other non-essential properties
 ```javascript
 [
     {
         "timestamp": "2019-11-14T00:55:31.820Z",
-        "longitude": -84,
-        "latitude": 34,
-        "elevation": 382.98,
-        "properties": {
-            "additionalParam1": 0,
-            "additionalParam2": "value2"
-        }
+        "longitude": -84.73334,
+        "latitude": 34.9392932,
+        "elevation": 382.98
     },
     ...
 ]
@@ -41,36 +37,49 @@ GIS and data analysis focused work related to the outsidely project. Utilizes Az
 ## Table Service Approach
 
 ### Users
-- PartitionKey/RowKey is the `userId`
-- Properties
-    - email
-    - First name
-    - Last name
-    - 
+- PartitionKey `userId`
+- RowKey `account`
+- Email
+- First name
+- Last name
+- Time zone
+- Avatar
 
 ### Activities
-- PartitionKey is the `userId`
-- RowKey is `activityId`
-- Properties
-    - Source File
-    - Preview Image (png)
-    - Activity Type (GPS: Run Bike,Non-GPS: Workout)
-    - Timestamp
-    - Time (s)
-    - Distance (m)
-    - Ascent (m)
-    - Descent (m)
-    - Future
-        - Moving Time (s)
-        - Average Moving Speed (m/s)
+- PartitionKey `userId`
+- RowKey `activityId`
+- Name
+- Description
+- Source File
+- Preview Image (png)
+- Activity Type (GPS: Run Bike,Non-GPS: Workout)
+- Timestamp
+- Time (s)
+- Distance (m)
+- Ascent (m)
+- Descent (m)
+- Future
+    - Moving Time (s)
+    - Average Moving Speed (m/s)
+
+### Comments
+- PartitionKey `activityId`
+- RowKey `commentId`
+- `userId`
+- Comment
+
+### Photos
+- PartitionKey `activityId`
+- RowKey `photoId`
+- Path
 
 ## Blob Storage Approach
 
 ### Activities
-Path is `activityId`\`fileType`
-- `sourceFile` Source file of the activity (gpx)
-- `geoJson` GeoJSON file for mapping (geojson)
-- `activityModel` Custom activity model
+Path is `activityId`\   `fileType`
+- `sourceFile` - Source file of the activity
+- `geoJson` - GeoJSON file for mapping (geojson)
+- `activityModel` - Custom activity model (json)
 
 ### Photos
-
+Path is `activityId`\photos\\`photoId`
