@@ -2,6 +2,12 @@
 
 GIS and data analysis focused work related to the outsidely project. Utilizes Azure Functions, Azure Table Service, and Azure Blob Storage.
 
+## Azure Resources
+- Resource Group: outsidely
+- Function App: outsidely-app-geo
+- Storage Account: outsidelystorage
+- Application Insights: outsidely-appinsights
+
 ## Processing Data Models
 
 ### activityDataModel
