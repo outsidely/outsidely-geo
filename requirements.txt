@@ -7,3 +7,5 @@ pyogrio
 geopandas
 staticmap
 shapely
+pyproj
+geographiclib
