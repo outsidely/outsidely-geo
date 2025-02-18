@@ -26,6 +26,7 @@ from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 import os
 from azure.data.tables import TableServiceClient, TableClient
+import datetime
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -227,4 +228,28 @@ def uploadActivity(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(415, "Unsupported Content-Type")
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
-    
+
+@app.route(route="activities", methods=[func.HttpMethod.GET])
+def activities(req: func.HttpRequest) -> func.HttpResponse:
+
+    logging.info('called activities')
+
+    try:
+
+        table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
+        table_client = table_service_client.get_table_client("activities")
+        time_string = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        entities = table_client.query_entities("Timestamp ge datetime'" + time_string + "'")
+
+        response = []
+        for entity in entities:
+            entity["timestamp"] = entity.metadata["timestamp"].isoformat()
+            response.append(entity)
+
+        response.sort(key=lambda x: x["timestamp"], reverse=True)
+
+        # return 
+        return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
+
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
