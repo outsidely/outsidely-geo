@@ -36,7 +36,7 @@ def createJsonHttpResponse(statusCode, message, properties = {}):
     response["message"] = message
     for k,v in properties.items():
         if (k in ["statusCode", "message"]):
-            raise ValueError("Properties cannot be named statusCode or message")
+            raise Exception("Properties cannot be named statusCode or message")
         else:
             response[k] = v
     return func.HttpResponse(json.dumps(response), status_code=statusCode, mimetype="applicaton/json")
@@ -49,7 +49,7 @@ def parseActivityData(geojson):
         if feature["geometry"]["type"] == "Point":
             properties = {}
             if prior_timestamp != "" and parser.parse(prior_timestamp) > parser.parse(feature["properties"]["time"]):
-                raise ValueError("Error: Detected out of order timestamp data")
+                raise Exception("Error: Detected out of order timestamp data")
             try:
                 if (feature["properties"]["time"]):
                     properties["timestamp"] = feature["properties"]["time"]
@@ -58,7 +58,7 @@ def parseActivityData(geojson):
                 if (feature["geometry"]["coordinates"][1]):
                     properties["latitude"] = feature["geometry"]["coordinates"][1]
             except:
-                raise ValueError("Could not parse timestamp, longitude, or latitude which are required")
+                raise Exception("Could not parse timestamp, longitude, or latitude which are required")
             try:
                 properties["elevation"] = feature["properties"]["ele"]
             except:
@@ -106,10 +106,23 @@ def upsertEntity(table, entity):
         partitionKey = entity["PartitionKey"]
         rowkey = entity["RowKey"]
     except:
-        raise ValueError("PartitionKey and RowKey are required for entities")
+        raise Exception("PartitionKey and RowKey are required for entities")
     table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
     table_client = table_service_client.get_table_client(table)
     table_client.upsert_entity(entity)
+
+def queryEntities(table, filter, sortProperty = "", sortReverse=None):
+    table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
+    table_client = table_service_client.get_table_client(table)
+    entities = table_client.query_entities(filter)
+    response = []
+    for entity in entities:
+        entity["timestamp"] = entity.metadata["timestamp"].isoformat()
+        response.append(entity)
+    if sortReverse != None:
+        response.sort(key=lambda s: s[sortProperty], reverse=sortReverse)
+    return response
+
 
 #curl "http://localhost:7071/api/uploadActivityTest" -H "Content-Type: application/gpx+xml" -d "@/home/jesse/Desktop/test.gpx" --output "/home/jesse/Desktop/test.geojson"
 @app.route(route="uploadActivityTest")
@@ -236,17 +249,8 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
 
-        table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
-        table_client = table_service_client.get_table_client("activities")
-        time_string = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        entities = table_client.query_entities("Timestamp ge datetime'" + time_string + "'")
-
-        response = []
-        for entity in entities:
-            entity["timestamp"] = entity.metadata["timestamp"].isoformat()
-            response.append(entity)
-
-        response.sort(key=lambda x: x["timestamp"], reverse=True)
+        filter = "Timestamp ge datetime'" + (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%SZ') + "'"
+        response = queryEntities("activities", filter, "timestamp", True)
 
         # return 
         return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
