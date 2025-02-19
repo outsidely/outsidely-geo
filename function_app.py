@@ -116,15 +116,19 @@ def upsertEntity(table, entity):
     table_client = table_service_client.get_table_client(table)
     table_client.upsert_entity(entity)
 
-def queryEntities(table, filter, sortProperty = None, sortReverse=None):
+def queryEntities(table, filter, sortProperty = None, sortReverse=False):
     table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
     table_client = table_service_client.get_table_client(table)
     entities = table_client.query_entities(filter)
     response = []
     for entity in entities:
         entity["timestamp"] = entity.metadata["timestamp"].isoformat()
+        for p in entity:
+            if type(p) == "azure.data.tables._deserialize.TablesEntityDatetime":
+                entity[p] = entity[p].isoformat()
+        entity["starttime"] = entity["starttime"].isoformat()
         response.append(entity)
-    if sortReverse != None:
+    if sortProperty != None:
         response.sort(key=lambda s: s[sortProperty], reverse=sortReverse)
     return response
 
