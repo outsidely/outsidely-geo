@@ -23,7 +23,7 @@ from dateutil import parser
 import math
 import uuid
 from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+from azure.storage.blob import BlobServiceClient, BlobClient, ContentSettings
 import os
 from azure.data.tables import TableServiceClient, TableClient
 import datetime
@@ -89,6 +89,7 @@ def parseStatisticsData(activityData):
         else:
             descent += activityData[i]["elevation"] - activityData[i+1]["elevation"]
 
+    statisticsData["starttime"] = min_time
     statisticsData["time"] = time
     statisticsData["distance"] = distance
     statisticsData["ascent"] = ascent
@@ -96,10 +97,14 @@ def parseStatisticsData(activityData):
 
     return statisticsData
 
-def saveBlob(data, name):
+def saveBlob(data, name, contentType = None):
     blob_service_client = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
     blob_client = blob_service_client.get_blob_client("outsidelycontainer",name)
-    blob_client.upload_blob(data)
+    if (contentType != None):
+        content_settings = ContentSettings(content_type=contentType)
+        blob_client.upload_blob(data, overwrite=True, content_settings=content_settings)
+    else:
+        blob_client.upload_blob(data, overwrite=True)
 
 def upsertEntity(table, entity):
     try:
@@ -111,7 +116,7 @@ def upsertEntity(table, entity):
     table_client = table_service_client.get_table_client(table)
     table_client.upsert_entity(entity)
 
-def queryEntities(table, filter, sortProperty = "", sortReverse=None):
+def queryEntities(table, filter, sortProperty = None, sortReverse=None):
     table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
     table_client = table_service_client.get_table_client(table)
     entities = table_client.query_entities(filter)
@@ -123,63 +128,7 @@ def queryEntities(table, filter, sortProperty = "", sortReverse=None):
         response.sort(key=lambda s: s[sortProperty], reverse=sortReverse)
     return response
 
-
-#curl "http://localhost:7071/api/uploadActivityTest" -H "Content-Type: application/gpx+xml" -d "@/home/jesse/Desktop/test.gpx" --output "/home/jesse/Desktop/test.geojson"
-@app.route(route="uploadActivityTest")
-def uploadActivityTest(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('called uploadActivityTest')
-    try:
-        if (req.headers["Content-Type"] == "application/gpx+xml"):
-            request_body = BytesIO(req.get_body())
-            data_frame = pyogrio.read_dataframe(request_body, layer="track_points")
-            geojson_out = BytesIO()
-            pyogrio.write_dataframe(data_frame, geojson_out, driver="GeoJSON", layer="track_points")
-            return func.HttpResponse(geojson_out.getvalue(), status_code=200, mimetype="application/geo+json")
-        else:
-            return createJsonHttpResponse(415, "Unsupported Content-Type")
-    except:
-        return createJsonHttpResponse(500, "Backend Error")
-
-#curl "http://localhost:7071/api/createStaticMap" -H "Content-Type: application/json" -d "@/home/jesse/Desktop/test.geojson" --output "/home/jesse/Desktop/test.png"
-@app.route(route="createStaticMap")
-def createStaticMap(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('called createStaticMap')
-    try:
-        if (req.headers["Content-Type"] == "application/json"):
-
-            geojson = req.get_json()
-            points = []
-            for point in parseActivityData(geojson):
-                points.append([point["longitude"],point["latitude"]])
-            simplified = json.loads(geopandas.GeoSeries([LineString(points)]).simplify(.0001).to_json())
-            m = StaticMap(360, 360, padding_x=10, padding_y=10, url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
-            m.add_line(Line(simplified["features"][0]["geometry"]["coordinates"], 'red', 3))
-            response_data = BytesIO()
-            image = m.render()
-            image.save(response_data, format="png")
-
-            return func.HttpResponse(response_data.getvalue(), status_code=200, mimetype="image/png")
-        else:
-            return createJsonHttpResponse(415, "Unsupported Content-Type")
-    except:
-        return createJsonHttpResponse(500, "Backend Error")
-
-#curl "http://localhost:7071/api/createStatisticsData" -H "Content-Type: application/json" -d "@/home/jesse/Desktop/test.geojson" --output "/home/jesse/Desktop/test.json"
-@app.route(route="createStatisticsData")
-def createStatisticsData(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('called createStatisticsData')
-    try:
-        if (req.headers["Content-Type"] == "application/json"):
-            body = req.get_json()
-            activityData = parseActivityData(body)
-            statisticsData = parseStatisticsData(activityData)
-            return func.HttpResponse(json.dumps(statisticsData), status_code=200, mimetype="application/json")
-        else:
-            return createJsonHttpResponse(415, "Unsupported Content-Type")
-    except:
-        return createJsonHttpResponse(500, "Backend Error")
-    
-#curl "http://localhost:7071/api/uploadActivity" -H "Content-Type: application/gpx+xml" -d "@/home/jesse/Desktop/test.gpx" --output -
+#curl "http://localhost:7071/api/uploadActivity" -F upload="@/home/jesse/Downloads/Something_different.gpx" -F userId=Jesse -F activityType=Unknown --output -
 @app.route(route="uploadActivity", methods=[func.HttpMethod.POST])
 def uploadActivity(req: func.HttpRequest) -> func.HttpResponse:
 
@@ -187,58 +136,72 @@ def uploadActivity(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
 
+        # validate data request at some point here before proceeding
+        userId = None
         activityId = str(uuid.uuid4())
+
+        upload = None
+        try:
+            upload = req.files["upload"].stream.read()
+        except:
+            return createJsonHttpResponse(400, "Missing upload data of activity (GPX file)")
+
+        properties = {}
+        properties["RowKey"] = activityId
+        try:
+            userId = req.form["userId"]
+            properties["PartitionKey"] = userId
+            properties["activityType"] = req.form["activityType"]
+        except:
+            return createJsonHttpResponse(400, "Missing required field (userId, activityType)")
+        properties_capture = ["name", "description"]
+        form_dict = req.form.to_dict()
+        for k in form_dict.keys():
+            if k in properties_capture:
+                properties[k] = form_dict[k]
+        upsertEntity("activities", properties)
+
+        # convert to geojson
+        data_frame = pyogrio.read_dataframe(upload, layer="track_points")
+        geojson_out = BytesIO()
+        pyogrio.write_dataframe(data_frame, geojson_out, driver="GeoJSON", layer="track_points")
+
+        # convert to activityModel
+        activityData = parseActivityData(json.loads(geojson_out.getvalue().decode()))
+        
+        # calculate statistics
+        statisticsData = parseStatisticsData(activityData)
+
+        # create static map
+        points = []
+        for point in activityData:
+            points.append([point["longitude"],point["latitude"]])
+        simplified = json.loads(geopandas.GeoSeries([LineString(points)]).simplify(.0001).to_json())
+        m = StaticMap(360, 360, padding_x=10, padding_y=10, url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
+        m.add_line(Line(simplified["features"][0]["geometry"]["coordinates"], 'red', 3))
+        response_data = BytesIO()
+        image = m.render()
+        image.save(response_data, format="png")
+
+        # save file, geojson, activityData, preview to storage container
+        saveBlob(upload, activityId + "/source.gpx", "application/gpx+xml")
+        saveBlob(geojson_out, activityId + "/geojson.json", "application/json")
+        saveBlob(json.dumps(activityData).encode(), activityId + "/activityData.json", "application/json")
+        saveBlob(response_data.getvalue(), activityId + "/preview.png", "image/png")
+
+        # save statistics to tblsvc
         upsertEntity("activities", {
-            "PartitionKey": "userId",
+            "PartitionKey": userId,
             "RowKey": activityId,
+            "time": statisticsData["time"],
+            "distance": statisticsData["distance"],
+            "ascent": statisticsData["ascent"],
+            "descent": statisticsData["descent"],
+            "starttime": statisticsData["starttime"]
         })
 
-        if (req.headers["Content-Type"] == "application/gpx+xml"):
+        return createJsonHttpResponse(201, "Successfully created activity", {"activityId": activityId})
 
-            # convert to geojson
-            request_body = BytesIO(req.get_body())
-            data_frame = pyogrio.read_dataframe(request_body, layer="track_points")
-            geojson_out = BytesIO()
-            pyogrio.write_dataframe(data_frame, geojson_out, driver="GeoJSON", layer="track_points")
-
-            # convert to activityModel
-            activityData = parseActivityData(json.loads(geojson_out.getvalue().decode()))
-            
-            # calculate statistics
-            statisticsData = parseStatisticsData(activityData)
-
-            # create static map
-            points = []
-            for point in activityData:
-                points.append([point["longitude"],point["latitude"]])
-            simplified = json.loads(geopandas.GeoSeries([LineString(points)]).simplify(.0001).to_json())
-            m = StaticMap(360, 360, padding_x=10, padding_y=10, url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
-            m.add_line(Line(simplified["features"][0]["geometry"]["coordinates"], 'red', 3))
-            response_data = BytesIO()
-            image = m.render()
-            image.save(response_data, format="png")
-
-            # save file, geojson, activityData, preview to storage container
-            saveBlob(request_body, activityId + "/source.gpx")
-            saveBlob(geojson_out, activityId + "/geojson.json")
-            saveBlob(json.dumps(activityData).encode(), activityId + "/activityData.json")
-            saveBlob(response_data.getvalue(), activityId + "/preview.png")
-
-            # save statistics + staticmap to tblsvc
-            upsertEntity("activities", {
-                "PartitionKey": "userId",
-                "RowKey": activityId,
-                "time": statisticsData["time"],
-                "distance": statisticsData["distance"],
-                "ascent": statisticsData["ascent"],
-                "descent": statisticsData["descent"]
-            })
-
-            # return 
-            return createJsonHttpResponse(201, "Successfully created activity", {"activityId": activityId})
-        
-        else:
-            return createJsonHttpResponse(415, "Unsupported Content-Type")
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 

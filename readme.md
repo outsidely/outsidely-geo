@@ -55,11 +55,12 @@ Objects should be in the array ordered by timestamp.
 ### Activities
 - PartitionKey `userId`
 - RowKey `activityId`
-    - Name
-    - Description
+    - User Defined
+        - Name
+        - Description
+        - Activity Type (GPS: Run Bike,Non-GPS: Workout)
     - Source File
     - Preview Image (png)
-    - Activity Type (GPS: Run Bike,Non-GPS: Workout)
     - Timestamp
     - Time (s)
     - Distance (m)
