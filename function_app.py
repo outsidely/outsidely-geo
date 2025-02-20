@@ -39,7 +39,7 @@ def createJsonHttpResponse(statusCode, message, properties = {}):
             raise Exception("Properties cannot be named statusCode or message")
         else:
             response[k] = v
-    return func.HttpResponse(json.dumps(response), status_code=statusCode, mimetype="applicaton/json")
+    return func.HttpResponse(json.dumps(response), status_code=statusCode, mimetype="application/json")
 
 # should ensure the output is good: everything has timestamp, longitude, latitude, timestamp is in order, longitude and latitude values are in domain
 def parseActivityData(geojson):
@@ -122,7 +122,7 @@ def queryEntities(table, filter, sortProperty = None, sortReverse=None):
     entities = table_client.query_entities(filter)
     response = []
     for entity in entities:
-        entity["timestamp"] = entity.metadata["timestamp"].isoformat()
+        entity["timestamp"] = str(entity.metadata["timestamp"].isoformat())
         response.append(entity)
     if sortReverse != None:
         response.sort(key=lambda s: s[sortProperty], reverse=sortReverse)
