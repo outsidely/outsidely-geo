@@ -39,7 +39,7 @@ def createJsonHttpResponse(statusCode, message, properties = {}):
             raise Exception("Properties cannot be named statusCode or message")
         else:
             response[k] = v
-    return func.HttpResponse(json.dumps(response), status_code=statusCode, mimetype="application/json")
+    return func.HttpResponse(json.dumps(response), status_code=statusCode, mimetype="applicaton/json")
 
 # should ensure the output is good: everything has timestamp, longitude, latitude, timestamp is in order, longitude and latitude values are in domain
 def parseActivityData(geojson):
@@ -116,15 +116,22 @@ def upsertEntity(table, entity):
     table_client = table_service_client.get_table_client(table)
     table_client.upsert_entity(entity)
 
-def queryEntities(table, filter, sortProperty = None, sortReverse=None):
+def queryEntities(table, filter, sortProperty = None, sortReverse=False):
     table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
     table_client = table_service_client.get_table_client(table)
     entities = table_client.query_entities(filter)
     response = []
     for entity in entities:
+<<<<<<< HEAD
         entity["timestamp"] = str(entity.metadata["timestamp"].isoformat())
+=======
+        entity["timestamp"] = entity.metadata["timestamp"]
+        for p in entity:
+            if "TablesEntityDatetime" in str(type(entity[p])):
+                entity[p] = entity[p].isoformat()
+>>>>>>> 269ed68f88eb98f6a5037c104c8c994ff1ec035f
         response.append(entity)
-    if sortReverse != None:
+    if sortProperty != None:
         response.sort(key=lambda s: s[sortProperty], reverse=sortReverse)
     return response
 
