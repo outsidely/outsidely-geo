@@ -122,14 +122,10 @@ def queryEntities(table, filter, sortProperty = None, sortReverse=False):
     entities = table_client.query_entities(filter)
     response = []
     for entity in entities:
-<<<<<<< HEAD
-        entity["timestamp"] = str(entity.metadata["timestamp"].isoformat())
-=======
         entity["timestamp"] = entity.metadata["timestamp"]
         for p in entity:
             if "TablesEntityDatetime" in str(type(entity[p])):
                 entity[p] = entity[p].isoformat()
->>>>>>> 269ed68f88eb98f6a5037c104c8c994ff1ec035f
         response.append(entity)
     if sortProperty != None:
         response.sort(key=lambda s: s[sortProperty], reverse=sortReverse)
