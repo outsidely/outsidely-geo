@@ -39,7 +39,7 @@ def createJsonHttpResponse(statusCode, message, properties = {}):
             raise Exception("Properties cannot be named statusCode or message")
         else:
             response[k] = v
-    return func.HttpResponse(json.dumps(response), status_code=statusCode, mimetype="applicaton/json")
+    return func.HttpResponse(json.dumps(response), status_code=statusCode, mimetype="application/json")
 
 # should ensure the output is good: everything has timestamp, longitude, latitude, timestamp is in order, longitude and latitude values are in domain
 def parseActivityData(geojson):
