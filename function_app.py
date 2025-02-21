@@ -44,8 +44,8 @@ def createJsonHttpResponse(statuscode, message, properties = {}):
 # should ensure the output is good: everything has timestamp, longitude, latitude, timestamp is in order, longitude and latitude values are in domain
 def parseActivityData(geojson):
     activitydata = []
-    priortimestamp = parser.parse("")
-    currenttimestamp = "2020-01-01T00:00:00+00:00"
+    priortimestamp = parser.parse("2020-01-01T00:00:00+00:00")
+    currenttimestamp = None
     for feature in geojson["features"]:
         if feature["geometry"]["type"] == "Point":
             properties = {}
@@ -170,9 +170,20 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         try:
             userid = req.form["userid"]
             properties["PartitionKey"] = userid
-            properties["activitytype"] = req.form["activitytype"]
         except:
-            return createJsonHttpResponse(400, "Missing required field (userid, activitytype)")
+            return createJsonHttpResponse(400, "Missing required field userid")
+        try:
+            properties["activitytype"] = req.form["activitytype"]
+            activitytypes = queryEntities("validations", "PartitionKey eq 'activitytype'", {"RowKey": "activitytype"})
+            activitytypefound = False
+            for at in activitytypes:
+                if at["activitytype"] == properties["activitytype"]:
+                    activitytypefound = True
+            if not activitytypefound:
+                raise
+        except:
+            return createJsonHttpResponse(400, "Missing or invalid activitytype")
+                    
         properties_capture = ["name", "description"]
         formdict = req.form.to_dict()
         for k in formdict.keys():
