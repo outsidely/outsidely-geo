@@ -30,26 +30,29 @@ import datetime
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
-def createJsonHttpResponse(statusCode, message, properties = {}):
+def createJsonHttpResponse(statuscode, message, properties = {}):
     response = {}
-    response["statusCode"] = statusCode
+    response["statusCode"] = statuscode
     response["message"] = message
     for k,v in properties.items():
-        if (k in ["statusCode", "message"]):
-            raise Exception("Properties cannot be named statusCode or message")
+        if (k in ["statuscode", "message"]):
+            raise Exception("Properties cannot be named statuscode or message")
         else:
             response[k] = v
-    return func.HttpResponse(json.dumps(response), status_code=statusCode, mimetype="application/json")
+    return func.HttpResponse(json.dumps(response), status_code=statuscode, mimetype="application/json")
 
 # should ensure the output is good: everything has timestamp, longitude, latitude, timestamp is in order, longitude and latitude values are in domain
 def parseActivityData(geojson):
-    activityData = []
-    prior_timestamp = ""
+    activitydata = []
+    priortimestamp = parser.parse("")
+    currenttimestamp = "2020-01-01T00:00:00+00:00"
     for feature in geojson["features"]:
         if feature["geometry"]["type"] == "Point":
             properties = {}
-            if prior_timestamp != "" and parser.parse(prior_timestamp) > parser.parse(feature["properties"]["time"]):
+            currenttimestamp = parser.parse(feature["properties"]["time"])
+            if priortimestamp != "" and priortimestamp > currenttimestamp:
                 raise Exception("Error: Detected out of order timestamp data")
+            priortimestamp = currenttimestamp
             try:
                 if (feature["properties"]["time"]):
                     properties["timestamp"] = feature["properties"]["time"]
@@ -63,48 +66,56 @@ def parseActivityData(geojson):
                 properties["elevation"] = feature["properties"]["ele"]
             except:
                 ex = True
-            activityData.append(properties)
-    return activityData
+            activitydata.append(properties)
+    return activitydata
 
-def parseStatisticsData(activityData):
+def parseStatisticsData(activitydata):
 
-    statisticsData = {}
+    statisticsdata = {}
 
-    min_time = parser.parse(activityData[0]["timestamp"])
-    max_time = parser.parse(activityData[len(activityData)-1]["timestamp"])
+    mintime = parser.parse(activitydata[0]["timestamp"])
+    maxtime = parser.parse(activitydata[len(activitydata)-1]["timestamp"])
 
-    time = (max_time - min_time).seconds
+    time = (maxtime - mintime).seconds
     distance = 0.0
     ascent = 0.0
     descent = 0.0
 
-    for i in range(len(activityData)-1):
-        x1 = activityData[i]["longitude"]
-        y1 = activityData[i]["latitude"]
-        x2 = activityData[i+1]["longitude"]
-        y2 = activityData[i+1]["latitude"]
+    for i in range(len(activitydata)-1):
+        x1 = activitydata[i]["longitude"]
+        y1 = activitydata[i]["latitude"]
+        x2 = activitydata[i+1]["longitude"]
+        y2 = activitydata[i+1]["latitude"]
         distance += Geodesic.WGS84.Inverse(y1, x1, y2, x2)['s12']
-        if (activityData[i+1]["elevation"] > activityData[i]["elevation"]):
-            ascent += activityData[i+1]["elevation"] - activityData[i]["elevation"]
+        if (activitydata[i+1]["elevation"] > activitydata[i]["elevation"]):
+            ascent += activitydata[i+1]["elevation"] - activitydata[i]["elevation"]
         else:
-            descent += activityData[i]["elevation"] - activityData[i+1]["elevation"]
+            descent += activitydata[i]["elevation"] - activitydata[i+1]["elevation"]
 
-    statisticsData["starttime"] = min_time
-    statisticsData["time"] = time
-    statisticsData["distance"] = distance
-    statisticsData["ascent"] = ascent
-    statisticsData["descent"] = descent
+    statisticsdata["starttime"] = mintime
+    statisticsdata["time"] = time
+    statisticsdata["distance"] = distance
+    statisticsdata["ascent"] = ascent
+    statisticsdata["descent"] = descent
 
-    return statisticsData
+    return statisticsdata
 
-def saveBlob(data, name, contentType = None):
-    blob_service_client = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
-    blob_client = blob_service_client.get_blob_client("outsidelycontainer",name)
-    if (contentType != None):
-        content_settings = ContentSettings(content_type=contentType)
-        blob_client.upload_blob(data, overwrite=True, content_settings=content_settings)
+def saveBlob(data, name, contenttype = None):
+    blobserviceclient = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
+    blobclient = blobserviceclient.get_blob_client(os.environ["storagecontainer"], name)
+    if (contenttype != None):
+        content_settings = ContentSettings(content_type=contenttype)
+        blobclient.upload_blob(data, overwrite=True, content_settings=content_settings)
     else:
-        blob_client.upload_blob(data, overwrite=True)
+        blobclient.upload_blob(data, overwrite=True)
+
+def getBlob(name):
+    blobserviceclient = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
+    blobclient = blobserviceclient.get_blob_client(os.environ["storagecontainer"], name)
+    blob = blobclient.download_blob()
+    data = BytesIO()
+    data = blob.readall()
+    return {"data": data, "contenttype": blob.properties.content_settings["content_type"]}
 
 def upsertEntity(table, entity):
     try:
@@ -112,36 +123,41 @@ def upsertEntity(table, entity):
         rowkey = entity["RowKey"]
     except:
         raise Exception("PartitionKey and RowKey are required for entities")
-    table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
-    table_client = table_service_client.get_table_client(table)
-    table_client.upsert_entity(entity)
+    tableserviceclient = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
+    tableclient = tableserviceclient.get_table_client(table)
+    tableclient.upsert_entity(entity)
 
-def queryEntities(table, filter, sortProperty = None, sortReverse=False):
+def queryEntities(table, filter, aliases = {}, sortProperty = None, sortReverse=False):
     table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
     table_client = table_service_client.get_table_client(table)
     entities = table_client.query_entities(filter)
     response = []
     for entity in entities:
-        entity["timestamp"] = entity.metadata["timestamp"]
+        currentity = {}
+        currentity["timestamp"] = entity.metadata["timestamp"].isoformat()
         for p in entity:
             if "TablesEntityDatetime" in str(type(entity[p])):
-                entity[p] = entity[p].isoformat()
-        response.append(entity)
+                currentity[p] = entity[p].isoformat()
+            else:
+                currentity[p] = entity[p]
+        for a in aliases:
+            currentity[aliases[a]] = currentity.pop(a)
+        response.append(currentity)
     if sortProperty != None:
         response.sort(key=lambda s: s[sortProperty], reverse=sortReverse)
     return response
 
-#curl "http://localhost:7071/api/uploadActivity" -F upload="@/home/jesse/Downloads/Something_different.gpx" -F userId=Jesse -F activityType=Unknown --output -
-@app.route(route="uploadActivity", methods=[func.HttpMethod.POST])
-def uploadActivity(req: func.HttpRequest) -> func.HttpResponse:
+#curl "http://localhost:7071/api/upload" -F upload="@/home/jesse/Downloads/Something_different.gpx" -F userid=Jesse -F activitytype=Other --output -
+@app.route(route="upload", methods=[func.HttpMethod.POST])
+def upload(req: func.HttpRequest) -> func.HttpResponse:
 
-    logging.info('called uploadActivity')
+    logging.info('called upload')
 
     try:
 
         # validate data request at some point here before proceeding
-        userId = None
-        activityId = str(uuid.uuid4())
+        userid = None
+        activityid = str(uuid.uuid4())
 
         upload = None
         try:
@@ -150,60 +166,60 @@ def uploadActivity(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(400, "Missing upload data of activity (GPX file)")
 
         properties = {}
-        properties["RowKey"] = activityId
+        properties["RowKey"] = activityid
         try:
-            userId = req.form["userId"]
-            properties["PartitionKey"] = userId
-            properties["activityType"] = req.form["activityType"]
+            userid = req.form["userid"]
+            properties["PartitionKey"] = userid
+            properties["activitytype"] = req.form["activitytype"]
         except:
-            return createJsonHttpResponse(400, "Missing required field (userId, activityType)")
+            return createJsonHttpResponse(400, "Missing required field (userid, activitytype)")
         properties_capture = ["name", "description"]
-        form_dict = req.form.to_dict()
-        for k in form_dict.keys():
+        formdict = req.form.to_dict()
+        for k in formdict.keys():
             if k in properties_capture:
-                properties[k] = form_dict[k]
+                properties[k] = formdict[k]
         upsertEntity("activities", properties)
 
         # convert to geojson
-        data_frame = pyogrio.read_dataframe(upload, layer="track_points")
-        geojson_out = BytesIO()
-        pyogrio.write_dataframe(data_frame, geojson_out, driver="GeoJSON", layer="track_points")
+        dataframe = pyogrio.read_dataframe(upload, layer="track_points")
+        geojson = BytesIO()
+        pyogrio.write_dataframe(dataframe, geojson, driver="GeoJSON", layer="track_points")
 
         # convert to activityModel
-        activityData = parseActivityData(json.loads(geojson_out.getvalue().decode()))
+        activitydata = parseActivityData(json.loads(geojson.getvalue().decode()))
         
         # calculate statistics
-        statisticsData = parseStatisticsData(activityData)
+        statisticsdata = parseStatisticsData(activitydata)
 
-        # create static map
+        # create preview
         points = []
-        for point in activityData:
+        for point in activitydata:
             points.append([point["longitude"],point["latitude"]])
         simplified = json.loads(geopandas.GeoSeries([LineString(points)]).simplify(.0001).to_json())
         m = StaticMap(360, 360, padding_x=10, padding_y=10, url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
         m.add_line(Line(simplified["features"][0]["geometry"]["coordinates"], 'red', 3))
-        response_data = BytesIO()
+        preview = BytesIO()
         image = m.render()
-        image.save(response_data, format="png")
+        image.save(preview, format="png")
 
         # save file, geojson, activityData, preview to storage container
-        saveBlob(upload, activityId + "/source.gpx", "application/gpx+xml")
-        saveBlob(geojson_out, activityId + "/geojson.json", "application/json")
-        saveBlob(json.dumps(activityData).encode(), activityId + "/activityData.json", "application/json")
-        saveBlob(response_data.getvalue(), activityId + "/preview.png", "image/png")
+        saveBlob(upload, activityid + "/source.gpx", "application/gpx+xml")
+        saveBlob(geojson, activityid + "/geojson.json", "application/json")
+        saveBlob(json.dumps(activitydata).encode(), activityid + "/activityData.json", "application/json")
+        saveBlob(preview.getvalue(), activityid + "/preview.png", "image/png")
 
         # save statistics to tblsvc
         upsertEntity("activities", {
-            "PartitionKey": userId,
-            "RowKey": activityId,
-            "time": statisticsData["time"],
-            "distance": statisticsData["distance"],
-            "ascent": statisticsData["ascent"],
-            "descent": statisticsData["descent"],
-            "starttime": statisticsData["starttime"]
+            "PartitionKey": userid,
+            "RowKey": activityid,
+            "time": statisticsdata["time"],
+            "distance": statisticsdata["distance"],
+            "ascent": statisticsdata["ascent"],
+            "descent": statisticsdata["descent"],
+            "starttime": statisticsdata["starttime"]
         })
 
-        return createJsonHttpResponse(201, "Successfully created activity", {"activityId": activityId})
+        return createJsonHttpResponse(201, "Successfully created activity", {"activityid": activityid})
 
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
@@ -216,10 +232,22 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
     try:
 
         filter = "Timestamp ge datetime'" + (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%SZ') + "'"
-        response = queryEntities("activities", filter, "timestamp", True)
+        response = queryEntities("activities", filter, {"PartitionKey": "userid", "RowKey": "activityid"}, "timestamp", True)
+        for a in response:
+            a["previewurl"] = "preview?activityId=" + a["activityid"]
 
-        # return 
         return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
 
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
+@app.route(route="preview", methods=[func.HttpMethod.GET])
+def preview(req: func.HttpRequest) -> func.HttpResponse:
+
+    logging.info('called preview')
+
+    try:
+        getblob = getBlob(req.params["activityId"] + "/preview.png")
+        return func.HttpResponse(getblob["data"], status_code=200, mimetype=getblob["contenttype"])
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
