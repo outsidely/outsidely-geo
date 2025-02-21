@@ -32,7 +32,7 @@ app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 def createJsonHttpResponse(statuscode, message, properties = {}):
     response = {}
-    response["statusCode"] = statuscode
+    response["statuscode"] = statuscode
     response["message"] = message
     for k,v in properties.items():
         if (k in ["statuscode", "message"]):
