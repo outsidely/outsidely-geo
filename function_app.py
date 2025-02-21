@@ -10,23 +10,23 @@
 #https://fitdecode.readthedocs.io/en/latest/
 #  useful for reading fit files
 
-import azure.functions as func
 import logging
+import os
+import datetime
+import math
 import geopandas
 import pyogrio
+import json
+import uuid
+import azure.functions as func
 from io import BytesIO
+from dateutil import parser
 from staticmap import *
 from shapely.geometry import LineString
-import json
 from geographiclib.geodesic import Geodesic
-from dateutil import parser
-import math
-import uuid
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient, BlobClient, ContentSettings
-import os
 from azure.data.tables import TableServiceClient, TableClient
-import datetime
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -245,7 +245,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         filter = "Timestamp ge datetime'" + (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%SZ') + "'"
         response = queryEntities("activities", filter, {"PartitionKey": "userid", "RowKey": "activityid"}, "timestamp", True)
         for a in response:
-            a["previewurl"] = "preview?activityId=" + a["activityid"]
+            a["previewurl"] = "preview?activityid=" + a["activityid"]
 
         return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
 
