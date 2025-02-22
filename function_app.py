@@ -127,24 +127,29 @@ def upsertEntity(table, entity):
     tableclient = tableserviceclient.get_table_client(table)
     tableclient.upsert_entity(entity)
 
-def queryEntities(table, filter, aliases = {}, sortProperty = None, sortReverse=False):
+def queryEntities(table, filter, properties = [], aliases = {}, sortproperty = None, sortreverse=False):
     table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
     table_client = table_service_client.get_table_client(table)
     entities = table_client.query_entities(filter)
     response = []
     for entity in entities:
         currentity = {}
-        currentity["timestamp"] = entity.metadata["timestamp"].isoformat()
+        if (len(properties)>0 and "timestamp" in properties) or len(properties)==0:
+            currentity["timestamp"] = entity.metadata["timestamp"].isoformat()
         for p in entity:
-            if "TablesEntityDatetime" in str(type(entity[p])):
-                currentity[p] = entity[p].isoformat()
-            else:
-                currentity[p] = entity[p]
+            if (len(properties)>0 and p in properties) or len(properties)==0:
+                if "TablesEntityDatetime" in str(type(entity[p])):
+                    currentity[p] = entity[p].isoformat()
+                else:
+                    currentity[p] = entity[p]
         for a in aliases:
             currentity[aliases[a]] = currentity.pop(a)
         response.append(currentity)
-    if sortProperty != None:
-        response.sort(key=lambda s: s[sortProperty], reverse=sortReverse)
+    if sortproperty != None:
+        try:
+            response.sort(key=lambda s: s[sortproperty], reverse=sortreverse)
+        except:
+            raise Exception("Error in sorting, likely due to missing property in response or entity")
     return response
 
 #curl "http://localhost:7071/api/upload" -F upload="@/home/jesse/Downloads/Something_different.gpx" -F userid=Jesse -F activitytype=Other --output -
@@ -172,7 +177,7 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(400, "Missing required field userid")
         try:
             activityproperties["activitytype"] = req.form["activitytype"]
-            activitytypes = queryEntities("validations", "PartitionKey eq 'activitytype'", {"RowKey": "activitytype"})
+            activitytypes = queryEntities("validations", "PartitionKey eq 'activitytype'", aliases={"RowKey": "activitytype"})
             activitytypefound = False
             for at in activitytypes:
                 if at["activitytype"] == activityproperties["activitytype"]:
@@ -240,22 +245,33 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
     try:
 
         filter = "Timestamp ge datetime'" + (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%SZ') + "'"
-        response = queryEntities("activities", filter, {"PartitionKey": "userid", "RowKey": "activityid"}, "timestamp", True)
+        response = queryEntities("activities",filter, aliases={"PartitionKey": "userid", "RowKey": "activityid"}, sortproperty="timestamp", sortreverse=True)
         for a in response:
-            a["previewurl"] = "preview?activityid=" + a["activityid"]
+            a["previewurl"] = "preview/" + a["activityid"]
 
         return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
 
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="preview", methods=[func.HttpMethod.GET])
+@app.route(route="preview/{activityid}", methods=[func.HttpMethod.GET])
 def preview(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info('called preview')
 
     try:
-        getblob = getBlob(req.params["activityid"] + "/preview.png")
+        getblob = getBlob(req.route_params.get("activityid") + "/preview.png")
         return func.HttpResponse(getblob["data"], status_code=200, mimetype=getblob["contenttype"])
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
+@app.route(route="validations/{validationtype}", methods=[func.HttpMethod.GET])
+def validations(req: func.HttpRequest) -> func.HttpResponse:
+
+    logging.info('called validations')
+
+    try:
+        data = queryEntities("validations", "PartitionKey eq '" + req.route_params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": "activitytype"}, "sort")
+        return func.HttpResponse(json.dumps(data), status_code=200, mimetype="application/json")
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
