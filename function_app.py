@@ -165,31 +165,22 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         except:
             return createJsonHttpResponse(400, "Missing upload data of activity (GPX file)")
 
-        properties = {}
-        properties["RowKey"] = activityid
+        activityproperties = {}
         try:
             userid = req.form["userid"]
-            properties["PartitionKey"] = userid
         except:
             return createJsonHttpResponse(400, "Missing required field userid")
         try:
-            properties["activitytype"] = req.form["activitytype"]
+            activityproperties["activitytype"] = req.form["activitytype"]
             activitytypes = queryEntities("validations", "PartitionKey eq 'activitytype'", {"RowKey": "activitytype"})
             activitytypefound = False
             for at in activitytypes:
-                if at["activitytype"] == properties["activitytype"]:
+                if at["activitytype"] == activityproperties["activitytype"]:
                     activitytypefound = True
             if not activitytypefound:
                 raise
         except:
             return createJsonHttpResponse(400, "Missing or invalid activitytype")
-                    
-        properties_capture = ["name", "description"]
-        formdict = req.form.to_dict()
-        for k in formdict.keys():
-            if k in properties_capture:
-                properties[k] = formdict[k]
-        upsertEntity("activities", properties)
 
         # convert to geojson
         dataframe = pyogrio.read_dataframe(upload, layer="track_points")
@@ -219,16 +210,22 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         saveBlob(json.dumps(activitydata).encode(), activityid + "/activityData.json", "application/json")
         saveBlob(preview.getvalue(), activityid + "/preview.png", "image/png")
 
+        # capture information
+        properties_capture = ["name", "description"]
+        formdict = req.form.to_dict()
+        for k in formdict.keys():
+            if k in properties_capture:
+                activityproperties[k] = formdict[k]
+        activityproperties["PartitionKey"] = userid
+        activityproperties["RowKey"] = activityid
+        activityproperties["time"] = statisticsdata["time"]
+        activityproperties["distance"] = statisticsdata["distance"]
+        activityproperties["ascent"] = statisticsdata["ascent"]
+        activityproperties["descent"] = statisticsdata["descent"]
+        activityproperties["starttime"] = statisticsdata["starttime"]
+
         # save statistics to tblsvc
-        upsertEntity("activities", {
-            "PartitionKey": userid,
-            "RowKey": activityid,
-            "time": statisticsdata["time"],
-            "distance": statisticsdata["distance"],
-            "ascent": statisticsdata["ascent"],
-            "descent": statisticsdata["descent"],
-            "starttime": statisticsdata["starttime"]
-        })
+        upsertEntity("activities", activityproperties)
 
         return createJsonHttpResponse(201, "Successfully created activity", {"activityid": activityid})
 
@@ -258,7 +255,7 @@ def preview(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called preview')
 
     try:
-        getblob = getBlob(req.params["activityId"] + "/preview.png")
+        getblob = getBlob(req.params["activityid"] + "/preview.png")
         return func.HttpResponse(getblob["data"], status_code=200, mimetype=getblob["contenttype"])
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
