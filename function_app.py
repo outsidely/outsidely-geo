@@ -13,7 +13,7 @@
 import logging
 import os
 import datetime
-import math
+import time
 import geopandas
 import pyogrio
 import json
@@ -152,7 +152,17 @@ def queryEntities(table, filter, properties = [], aliases = {}, sortproperty = N
             raise Exception("Error in sorting, likely due to missing property in response or entity")
     return response
 
-#curl "http://localhost:7071/api/upload" -F upload="@/home/jesse/Downloads/Something_different.gpx" -F userid=Jesse -F activitytype=Other --output -
+def tsUnixToIso(ts):
+    return datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+def validateUserId(userid):
+    data = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'")
+    if len(data) == 0:
+        return False
+    else:
+        return True
+
+#curl "http://localhost:7071/api/upload" -F upload="@/home/jesse/Downloads/Something_different.gpx" -F userid=jamund -F secret=EZmnFTuQPVnCydWCuJVbHpcS5vZvSjKq -F activitytype=Other --output -
 @app.route(route="upload", methods=[func.HttpMethod.POST])
 def upload(req: func.HttpRequest) -> func.HttpResponse:
 
@@ -172,11 +182,18 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
 
         activityproperties = {}
         try:
-            userid = req.form["userid"]
+            userid = req.form.get("userid")
+            secret = req.form.get("secret")
         except:
-            return createJsonHttpResponse(400, "Missing required field userid")
+            return createJsonHttpResponse(400, "Missing userid or secret")
         try:
-            activityproperties["activitytype"] = req.form["activitytype"]
+            userdata = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account' and secret eq '" + secret + "'")
+            if len(userdata) == 0:
+                raise
+        except:
+            return createJsonHttpResponse(400, "Invalid userid or secret")
+        try:
+            activityproperties["activitytype"] = req.form.get("activitytype")
             activitytypes = queryEntities("validations", "PartitionKey eq 'activitytype'", aliases={"RowKey": "activitytype"})
             activitytypefound = False
             for at in activitytypes:
@@ -244,23 +261,50 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
 
-        filter = "Timestamp ge datetime'" + (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%SZ') + "'"
-        response = queryEntities("activities",filter, aliases={"PartitionKey": "userid", "RowKey": "activityid"}, sortproperty="timestamp", sortreverse=True)
-        for a in response:
-            a["previewurl"] = "preview/" + a["activityid"]
+        delta = 86400*7
+        endtime = 0
+        starttime = 0
+
+        if "endtime" in req.params.keys() and "starttime" in req.params.keys():
+            endtime = int(req.params.get("endtime"))
+            starttime = int(req.params.get("starttime"))
+            if (endtime - starttime > delta):
+                raise Exception("Maximum time delta of " + str(delta) + " for activities")
+        else:
+            endtime = int(time.time())
+            starttime = int(endtime - delta)
+
+        filter = "Timestamp le datetime'" + tsUnixToIso(endtime) + "' and Timestamp ge datetime'" + tsUnixToIso(starttime) + "'"
+        if "userid" in req.params.keys():
+            filter += " and PartitionKey eq '" + req.params.get("userid") + "'"
+
+        activities = queryEntities("activities", filter, aliases={"PartitionKey": "userid", "RowKey": "activityid"}, sortproperty="timestamp", sortreverse=True)
+        
+        for a in activities:
+            a["previewurl"] = "preview?activityid=" + a["activityid"]
+            userdata = queryEntities("users","PartitionKey eq '" + a["userid"] + "' and RowKey eq 'account'")
+            if len(userdata) > 0:
+                a["firstname"] = userdata[0]["firstname"]
+                a["lastname"] = userdata[0]["lastname"]
+        
+        nexturl = "activities?endtime=" +str(starttime) + "&starttime=" + str(starttime - delta)
+        if "userid" in req.params.keys():
+            nexturl += "&userid=" + req.params.get("userid")
+        
+        response = {"activities": activities, "nexturl": nexturl}
 
         return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
 
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="preview/{activityid}", methods=[func.HttpMethod.GET])
+@app.route(route="preview", methods=[func.HttpMethod.GET])
 def preview(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info('called preview')
 
     try:
-        getblob = getBlob(req.route_params.get("activityid") + "/preview.png")
+        getblob = getBlob(req.params.get("activityid") + "/preview.png")
         return func.HttpResponse(getblob["data"], status_code=200, mimetype=getblob["contenttype"])
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
