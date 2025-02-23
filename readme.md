@@ -1,6 +1,6 @@
 # outsidely-geo
 
-GIS and data analysis focused work related to the outsidely project. Utilizes Azure Functions, Azure Table Service, and Azure Blob Storage.
+GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Functions, Azure Table Service, and Azure Blob Storage.
 
 ## Azure Resources
 - Resource Group: outsidely
@@ -10,7 +10,7 @@ GIS and data analysis focused work related to the outsidely project. Utilizes Az
 
 ## Processing Data Models
 
-### activityDataModel
+### Activity Data
 Objects should be in the array ordered by timestamp.
 - **timestamp** - string - required - ISO 8601 formatted, UTC+0
 - **longitude** - number - required - WGS84 Longitude
@@ -28,7 +28,7 @@ Objects should be in the array ordered by timestamp.
 ]
 ```
 
-### statisticsModel
+### Statisics Data
 - **time** - number - required - Total time elapsed for the activity in seconds
 - **distance** - number - required - Total length of the activity in meters
 - **ascent** - number - Total ascent of the activity in meters
@@ -41,53 +41,61 @@ Objects should be in the array ordered by timestamp.
 }
 ```
 
-## Table Service Approach
+## Tables
 
 ### Users
-- PartitionKey `userId`
+- PartitionKey `userid`
 - RowKey `account`
-    - Email
-    - First name
-    - Last name
-    - Time zone
-    - Avatar
+    - email
+    - firstname
+    - lastname
+    - timezone
+    - avatar (blob storage)
 
 ### Activities
-- PartitionKey `userId`
-- RowKey `activityId`
-    - User Defined
-        - Name
-        - Description
-        - Activity Type (GPS: Run Bike,Non-GPS: Workout)
-    - Source File
-    - Preview Image (png)
-    - Timestamp
-    - Time (s)
-    - Distance (m)
-    - Ascent (m)
-    - Descent (m)
-    - Future
-        - Moving Time (s)
-        - Average Moving Speed (m/s)
+- PartitionKey `userid`
+- RowKey `activityid`
+    - name
+    - description
+    - activitytype (run, ride, other)
+    - 
+    - starttime
+    - time
+    - distance
+    - ascent
+    - descent
 
 ### Comments
-- PartitionKey `activityId`
-- RowKey `commentId`
-    - `userId`
-    - Comment
+- PartitionKey `activityid`
+- RowKey `commentid`
+    - `userid`
+    - timestamp
+    - comment
 
 ### Photos
-- PartitionKey `activityId`
-- RowKey `photoId`
+- PartitionKey `activityid`
+- RowKey `photoid`
     - Path
 
 ## Blob Storage Approach
 
 ### Activities
-Path is `activityId`\   `fileType`
-- `sourceFile` - Source file of the activity
-- `geoJson` - GeoJSON file for mapping (geojson)
-- `activityModel` - Custom activity model (json)
+Files stored in path of `activityid`
+- `source.gpx` - Source file of the activity
+- `geojson.json` - GeoJSON file for mapping (geojson)
+- `activityData.json` - Custom activity model (json)
 
 ### Photos
-Path is `activityId`\photos\\`photoId`
+Path is `activityid`\photos\\`photoid`
+
+## Work Items
+- High
+    - Comments
+    - Photos
+- Medium
+    - Gear (create update, delete)
+    - Comments (create, delete)
+    - Photos (create, delete)
+- Low
+    - Moving time
+    - Smoothing for elevation
