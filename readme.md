@@ -16,8 +16,10 @@ GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Funct
 - `/activities?userid=jamund` will create a feed limited to the provided userid
 - `/activities?userid=jamundsen&activityid=d54ece30-8ced-438d-80f8-674bcd45270b` will filter to just one activity
 
-### GET preview
-- Gets the preview image. Will likely be deprecated for a more generic blob data based API.
+### GET data
+- Gets binary data objects stored in blob storage
+- `/data?datatype=preview&activityid=d54ece30-8ced-438d-80f8-674bcd45270b` gets a preview png for an activityid
+- `/data?datatype=geojson&activityid=d54ece30-8ced-438d-80f8-674bcd45270b` gets the raw geojson for an activityid for map display
 
 ### GET validations
 - Built as a generic way to have constrained system values.
@@ -128,9 +130,6 @@ Path is `activityid`\photos\\`photoid`
     - System for incorporating more activitytypes as time goes on (ebike, kayak, swimming, pickleball, etc)
     - Like/Seen/Kudos for activities
     - Weekly, Monthly, Yearly stats
-- Cleanup at some point
-    - Remove old validations/route based API entry once outsidely-web is clean of it
-    - Secret to password rename cleanup
 - Long term
     - Moving time
     - Smoothing for elevation

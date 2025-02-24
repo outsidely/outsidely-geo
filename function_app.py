@@ -162,6 +162,13 @@ def validateUserId(userid):
     else:
         return True
 
+def validateData(validationtype, value):
+    eq = queryEntities("validations","PartitionKey eq '" + validationtype + "' and RowKey eq '" + value + "'")
+    if len(eq) == 0:
+        return False
+    else:
+        return True
+
 #curl "http://localhost:7071/api/upload" -F upload="@/home/jesse/Downloads/Something_different.gpx" -F userid=jamund -F password=EZmnFTuQPVnCydWCuJVbHpcS5vZvSjKq -F activitytype=Other --output -
 @app.route(route="upload", methods=[func.HttpMethod.POST])
 def upload(req: func.HttpRequest) -> func.HttpResponse:
@@ -196,12 +203,7 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(401, "Invalid userid or password")
         try:
             activityproperties["activitytype"] = req.form.get("activitytype")
-            activitytypes = queryEntities("validations", "PartitionKey eq 'activitytype'", aliases={"RowKey": "activitytype"})
-            activitytypefound = False
-            for at in activitytypes:
-                if at["activitytype"] == activityproperties["activitytype"]:
-                    activitytypefound = True
-            if not activitytypefound:
+            if not validateData("activitytype", activityproperties["activitytype"]):
                 raise
         except:
             return createJsonHttpResponse(400, "Missing or invalid activitytype")
@@ -290,7 +292,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         activities = queryEntities("activities", filter, aliases={"PartitionKey": "userid", "RowKey": "activityid"}, sortproperty="timestamp", sortreverse=True)
         
         for a in activities:
-            a["previewurl"] = "preview?activityid=" + a["activityid"]
+            a["previewurl"] = "data?datatype=preview&activityid=" + a["activityid"]
             userdata = queryEntities("users","PartitionKey eq '" + a["userid"] + "' and RowKey eq 'account'")
             if len(userdata) > 0:
                 a["firstname"] = userdata[0]["firstname"]
@@ -307,15 +309,36 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
 
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
+    
+@app.route(route="data", methods=[func.HttpMethod.GET])
+def data(req: func.HttpRequest) -> func.HttpResponse:
 
-@app.route(route="preview", methods=[func.HttpMethod.GET])
-def preview(req: func.HttpRequest) -> func.HttpResponse:
-
-    logging.info('called preview')
+    logging.info('called data')
 
     try:
-        getblob = getBlob(req.params.get("activityid") + "/preview.png")
+
+        if "datatype" not in req.params.keys():
+            return createJsonHttpResponse(400, "datatype required")
+        
+        datatype = req.params.get("datatype")
+
+        if not validateData("datatype", datatype):
+            return createJsonHttpResponse(400, "datatype invalid")
+
+        match datatype:
+            case "preview":
+                if "activityid" not in req.params.keys():
+                    return createJsonHttpResponse(400, "activityid required")
+                getblob = getBlob(req.params.get("activityid") + "/preview.png")
+            case "geojson":
+                if "activityid" not in req.params.keys():
+                    return createJsonHttpResponse(400, "activityid required")
+                getblob = getBlob(req.params.get("activityid") + "/geojson.json")
+            case _:
+                return createJsonHttpResponse(400, "invalid datatype")
+
         return func.HttpResponse(getblob["data"], status_code=200, mimetype=getblob["contenttype"])
+    
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
