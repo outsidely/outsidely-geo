@@ -2,6 +2,27 @@
 
 GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Functions, Azure Table Service, and Azure Blob Storage.
 
+## APIs
+
+### POST upload
+- Upload a GPX of an activity using multi part form data
+- Required: upload (GPX as binary file), userid, secret, activitytype
+- Optional: name, description
+- Successful response `{"statuscode":201,"message": "Successfully created activity","activityid":"faa0c893-7c44-45ae-b618-eab5d03337ad"}`
+
+### GET activities
+- Get information about activities with lots of customization for the response
+- `/activities` will start at the current time and provide a feed of all activities as well as a continuation url to follow for more
+- `/activities?userid=jamund` will create a feed limited to the provided userid
+- `/activities?userid=jamundsen&activityid=d54ece30-8ced-438d-80f8-674bcd45270b` will filter to just one activity
+
+### GET preview
+- Gets the preview image. Will likely be deprecated for a more generic blob data based API.
+
+### GET validations
+- Built as a generic way to have constrained system values.
+- Currently used for activitytypes by calling `/validations?validationtype=activitytypes`
+
 ## Azure Resources
 - Resource Group: outsidely
 - Function App: outsidely-app-geo
@@ -89,6 +110,9 @@ Files stored in path of `activityid`
 Path is `activityid`\photos\\`photoid`
 
 ## Work Items
+- Unclassified
+    - Consider renaming secret to password so browsers will autofill it in
+    - Create one API that handles retrieving data from blob storage rather than one for each type of request (replaces preview)
 - High
     - Comments
     - Photos
