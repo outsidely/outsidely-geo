@@ -6,7 +6,7 @@ GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Funct
 
 ### POST upload
 - Upload a GPX of an activity using multi part form data
-- Required: upload (GPX as binary file), userid, secret, activitytype
+- Required: upload (GPX as binary file), userid, password, activitytype
 - Optional: name, description
 - Successful response `{"statuscode":201,"message": "Successfully created activity","activityid":"faa0c893-7c44-45ae-b618-eab5d03337ad"}`
 
@@ -79,7 +79,6 @@ Objects should be in the array ordered by timestamp.
     - name
     - description
     - activitytype (run, ride, other)
-    - 
     - starttime
     - time
     - distance
@@ -113,13 +112,26 @@ Path is `activityid`\photos\\`photoid`
 - Unclassified
     - Consider renaming secret to password so browsers will autofill it in
     - Create one API that handles retrieving data from blob storage rather than one for each type of request (replaces preview)
+    - Activities response returns laundered information
+        - activitytype to label
+        - converted values based on metric/imperial selection for a current user
+        - speed/pace depending on activitytype
 - High
-    - Comments
-    - Photos
+    - Agree on authentication scheme - needed for gear, comments, photos, and all user-based preferences
 - Medium
     - Gear (create update, delete)
     - Comments (create, delete)
     - Photos (create, delete)
+    - Map for the activity page w/ elevation profile and linked event support
 - Low
+    - System for incorporating more activitytypes as time goes on (ebike, kayak, swimming, pickleball, etc)
+    - Like/Seen/Kudos for activities
+    - Weekly, Monthly, Yearly stats
+- Cleanup at some point
+    - Remove old validations/route based API entry once outsidely-web is clean of it
+    - Secret to password rename cleanup
+- Long term
     - Moving time
     - Smoothing for elevation
+    - Support using DEM-based elevation
+    - Privacy zones

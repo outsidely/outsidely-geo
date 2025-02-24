@@ -162,7 +162,7 @@ def validateUserId(userid):
     else:
         return True
 
-#curl "http://localhost:7071/api/upload" -F upload="@/home/jesse/Downloads/Something_different.gpx" -F userid=jamund -F secret=EZmnFTuQPVnCydWCuJVbHpcS5vZvSjKq -F activitytype=Other --output -
+#curl "http://localhost:7071/api/upload" -F upload="@/home/jesse/Downloads/Something_different.gpx" -F userid=jamund -F password=EZmnFTuQPVnCydWCuJVbHpcS5vZvSjKq -F activitytype=Other --output -
 @app.route(route="upload", methods=[func.HttpMethod.POST])
 def upload(req: func.HttpRequest) -> func.HttpResponse:
 
@@ -170,7 +170,6 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
 
-        # validate data request at some point here before proceeding
         userid = None
         activityid = str(uuid.uuid4())
 
@@ -183,15 +182,18 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties = {}
         try:
             userid = req.form.get("userid")
-            secret = req.form.get("secret")
+            if "secret" in req.form.keys():
+                password = req.form.get("secret")
+            else:
+                password = req.form.get("password")
         except:
-            return createJsonHttpResponse(401, "Missing userid or secret")
+            return createJsonHttpResponse(401, "Missing userid or password")
         try:
-            userdata = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account' and secret eq '" + secret + "'")
+            userdata = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account' and password eq '" + password + "'")
             if len(userdata) == 0:
                 raise
         except:
-            return createJsonHttpResponse(401, "Invalid userid or secret")
+            return createJsonHttpResponse(401, "Invalid userid or password")
         try:
             activityproperties["activitytype"] = req.form.get("activitytype")
             activitytypes = queryEntities("validations", "PartitionKey eq 'activitytype'", aliases={"RowKey": "activitytype"})
@@ -319,9 +321,9 @@ def preview(req: func.HttpRequest) -> func.HttpResponse:
 
 # will be deprecated in all likelihood
 @app.route(route="validations/{validationtype}", methods=[func.HttpMethod.GET])
-def validations(req: func.HttpRequest) -> func.HttpResponse:
+def validationsroute(req: func.HttpRequest) -> func.HttpResponse:
 
-    logging.info('called validations')
+    logging.info('called validationsroute')
 
     try:
         data = queryEntities("validations", "PartitionKey eq '" + req.route_params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": "activitytype"}, "sort")
