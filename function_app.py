@@ -219,12 +219,14 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         # calculate statistics
         statisticsdata = parseStatisticsData(activitydata)
 
-        # create preview
+        # create clean track file
         points = []
         for point in activitydata:
             points.append([point["longitude"],point["latitude"]])
         route = geopandas.GeoSeries([LineString(points)])
         routejson = json.loads(route.to_json())
+
+        # create preview
         routejsonsimplified = json.loads(route.simplify(.0001).to_json())
         m = StaticMap(360, 360, padding_x=10, padding_y=10, url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
         m.add_line(Line(routejsonsimplified["features"][0]["geometry"]["coordinates"], 'red', 3))
@@ -234,7 +236,7 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
 
         # save file, geojson, activityData, preview to storage container
         saveBlob(upload, activityid + "/source.gpx", "application/gpx+xml")
-        saveBlob(routejson, activityid + "/geojson.json", "application/json")
+        saveBlob(json.dumps(routejson).encode(), activityid + "/geojson.json", "application/json")
         saveBlob(json.dumps(activitydata).encode(), activityid + "/activityData.json", "application/json")
         saveBlob(preview.getvalue(), activityid + "/preview.png", "image/png")
 
