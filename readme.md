@@ -22,6 +22,7 @@ GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Funct
 ### GET validations
 - Built as a generic way to have constrained system values.
 - Currently used for activitytypes by calling `/validations?validationtype=activitytypes`
+- Example of future usage `/validations?validationtype=unitsystem`
 
 ## Azure Resources
 - Resource Group: outsidely

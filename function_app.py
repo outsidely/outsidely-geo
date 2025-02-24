@@ -319,25 +319,15 @@ def preview(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-# will be deprecated in all likelihood
-@app.route(route="validations/{validationtype}", methods=[func.HttpMethod.GET])
-def validationsroute(req: func.HttpRequest) -> func.HttpResponse:
-
-    logging.info('called validationsroute')
-
-    try:
-        data = queryEntities("validations", "PartitionKey eq '" + req.route_params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": "activitytype"}, "sort")
-        return func.HttpResponse(json.dumps(data), status_code=200, mimetype="application/json")
-    except Exception as ex:
-        return createJsonHttpResponse(500, str(ex))
-
 @app.route(route="validations", methods=[func.HttpMethod.GET])
 def validations(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info('called validations')
 
     try:
-        data = queryEntities("validations", "PartitionKey eq '" + req.params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": "activitytype"}, "sort")
+        if "validationtype" not in req.params.keys():
+            return createJsonHttpResponse(400, "validationtype parameter required")
+        data = queryEntities("validations", "PartitionKey eq '" + req.params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": req.params["validationtype"]}, "sort")
         return func.HttpResponse(json.dumps(data), status_code=200, mimetype="application/json")
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
