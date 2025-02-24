@@ -113,14 +113,12 @@ Path is `activityid`\photos\\`photoid`
 
 ## Work Items
 - Unclassified
-    - Consider renaming secret to password so browsers will autofill it in
-    - Create one API that handles retrieving data from blob storage rather than one for each type of request (replaces preview)
     - Activities response returns laundered information
         - activitytype to label
         - converted values based on metric/imperial selection for a current user
         - speed/pace depending on activitytype
 - High
-    - Agree on authentication scheme - needed for gear, comments, photos, and all user-based preferences
+    - Agree and implement auth scheme - needed for gear, comments, photos, and all user-based preferences
 - Medium
     - Gear (create update, delete)
     - Comments (create, delete)
