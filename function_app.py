@@ -131,10 +131,12 @@ def upsertEntity(table, entity):
     tableclient = tableserviceclient.get_table_client(table)
     tableclient.upsert_entity(entity)
 
-def queryEntities(table, filter, properties = [], aliases = {}, sortproperty = None, sortreverse=False):
+def queryEntities(table, filter, properties = None, aliases = {}, sortproperty = None, sortreverse=False):
     table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
     table_client = table_service_client.get_table_client(table)
-    entities = table_client.query_entities(filter)
+    entities = table_client.query_entities(filter, select=properties)
+    if properties == None:
+        properties = []
     response = []
     for entity in entities:
         currentity = {}
@@ -172,7 +174,7 @@ def authorizer(req):
         parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
         userid = parts[0]
         password = parts[1]
-        qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'")
+        qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'", ["salt", "password"])
         if len(qe) > 0:
             salt = qe[0]["salt"]
             if hashlib.sha512(str(salt + password).encode()).hexdigest() == qe[0]["password"]:

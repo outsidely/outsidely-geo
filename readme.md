@@ -52,10 +52,11 @@ Objects should be in the array ordered by timestamp.
 ]
 ```
 
-### Statisics Data
+### Statistics Data
 - **time** - number - required - Total time elapsed for the activity in seconds
 - **distance** - number - required - Total length of the activity in meters
 - **ascent** - number - Total ascent of the activity in meters
+- **descent** - number - Total descent of the activity in meters
 ```javascript
 {
     "time": 9786,
