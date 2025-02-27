@@ -18,6 +18,10 @@ import geopandas
 import pyogrio
 import json
 import uuid
+import base64
+import hashlib
+import secrets
+import string
 import azure.functions as func
 from io import BytesIO
 from dateutil import parser
@@ -30,7 +34,7 @@ from azure.data.tables import TableServiceClient, TableClient
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
-def createJsonHttpResponse(statuscode, message, properties = {}):
+def createJsonHttpResponse(statuscode, message, properties = {}, headers = {}):
     response = {}
     response["statuscode"] = statuscode
     response["message"] = message
@@ -39,7 +43,7 @@ def createJsonHttpResponse(statuscode, message, properties = {}):
             raise Exception("Properties cannot be named statuscode or message")
         else:
             response[k] = v
-    return func.HttpResponse(json.dumps(response), status_code=statuscode, mimetype="application/json")
+    return func.HttpResponse(json.dumps(response), status_code=statuscode, mimetype="application/json", headers=headers)
 
 # should ensure the output is good: everything has timestamp, longitude, latitude, timestamp is in order, longitude and latitude values are in domain
 def parseActivityData(geojson):
@@ -155,19 +159,28 @@ def queryEntities(table, filter, properties = [], aliases = {}, sortproperty = N
 def tsUnixToIso(ts):
     return datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-def validateUserId(userid):
-    data = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'")
-    if len(data) == 0:
-        return False
-    else:
-        return True
-
 def validateData(validationtype, value):
     eq = queryEntities("validations","PartitionKey eq '" + validationtype + "' and RowKey eq '" + value + "'")
     if len(eq) == 0:
         return False
     else:
         return True
+
+def authorizer(req):
+    try:
+        authorized = False
+        parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
+        userid = parts[0]
+        password = parts[1]
+        qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'")
+        if len(qe) > 0:
+            salt = qe[0]["salt"]
+            if hashlib.sha512(str(salt + password).encode()).hexdigest() == qe[0]["password"]:
+                authorized = True
+    except:
+        authorized = False
+        userid = ""
+    return {"authorized": authorized, "userid": userid}
 
 #curl "http://localhost:7071/api/upload" -F upload="@/home/jesse/Downloads/Something_different.gpx" -F userid=jamund -F password=EZmnFTuQPVnCydWCuJVbHpcS5vZvSjKq -F activitytype=Other --output -
 @app.route(route="upload", methods=[func.HttpMethod.POST])
@@ -177,7 +190,10 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
 
-        userid = None
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+
         activityid = str(uuid.uuid4())
 
         upload = None
@@ -187,20 +203,7 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(400, "Missing upload data of activity (GPX file)")
 
         activityproperties = {}
-        try:
-            userid = req.form.get("userid")
-            if "secret" in req.form.keys():
-                password = req.form.get("secret")
-            else:
-                password = req.form.get("password")
-        except:
-            return createJsonHttpResponse(401, "Missing userid or password")
-        try:
-            userdata = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account' and password eq '" + password + "'")
-            if len(userdata) == 0:
-                raise
-        except:
-            return createJsonHttpResponse(401, "Invalid userid or password")
+
         try:
             activityproperties["activitytype"] = req.form.get("activitytype")
             if not validateData("activitytype", activityproperties["activitytype"]):
@@ -246,7 +249,7 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         for k in formdict.keys():
             if k in properties_capture:
                 activityproperties[k] = formdict[k]
-        activityproperties["PartitionKey"] = userid
+        activityproperties["PartitionKey"] = auth["userid"]
         activityproperties["RowKey"] = activityid
         activityproperties["time"] = statisticsdata["time"]
         activityproperties["distance"] = statisticsdata["distance"]
@@ -268,6 +271,10 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called activities')
 
     try:
+
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
 
         feedresponse = True
         filter = ""
@@ -321,6 +328,10 @@ def data(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
 
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+
         if "datatype" not in req.params.keys():
             return createJsonHttpResponse(400, "datatype required")
         
@@ -351,10 +362,22 @@ def validations(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info('called validations')
 
+    auth = authorizer(req)
+    if not auth["authorized"]:
+        return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+
     try:
+        
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+        
         if "validationtype" not in req.params.keys():
             return createJsonHttpResponse(400, "validationtype parameter required")
+        
         data = queryEntities("validations", "PartitionKey eq '" + req.params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": req.params["validationtype"]}, "sort")
+
         return func.HttpResponse(json.dumps(data), status_code=200, mimetype="application/json")
+    
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))

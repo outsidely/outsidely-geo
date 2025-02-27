@@ -1,19 +1,13 @@
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
-import json
-import os
-from azure.data.tables import TableServiceClient, TableClient
-import datetime
-import io
+import secrets
+import string
+import hashlib
 
-os.environ["storageaccount_connectionstring"] = "DefaultEndpointsProtocol=https;AccountName=outsidelystorage;AccountKey=41GZ5nit1vilCAa+nBxwGy9hvRz5WMsGugWGI2ICv3+XcFpxy/5z03i/AbKr7yvFl5l6mYgLJxJa+AStTw8fOw==;EndpointSuffix=core.windows.net"
+length = 16
+salt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(length))
+print(salt)
 
-def getBlob(name):
-    blob_service_client = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
-    blob_client = blob_service_client.get_blob_client("outsidelycontainer", name)
-    blob = io.BytesIO()
-    blob = blob_client.download_blob().readall()
-    return {"blob": blob, "contentType": "image/png"}
+password = 'wcUvrPZ3TnsK5SKMMmZyyrcWGFSkwfux'
 
-blob = getBlob("62ec8405-419c-4470-a1d1-aff46e99eb4c/preview.png")
-print("howdy")
+hash = hashlib.sha512(str(salt + password).encode()).hexdigest()
+
+print(hash)
