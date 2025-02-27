@@ -119,7 +119,7 @@ Path is `activityid`\photos\\`photoid`
         - converted values based on metric/imperial selection for a current user
         - speed/pace depending on activitytype
 - High
-    - Agree and implement auth scheme - needed for gear, comments, photos, and all user-based preferences
+    - ~~Agree and implement auth scheme - needed for gear, comments, photos, and all user-based preferences~~
 - Medium
     - Gear (create update, delete)
     - Comments (create, delete)
@@ -127,6 +127,8 @@ Path is `activityid`\photos\\`photoid`
     - Map for the activity page w/ elevation profile and linked event support
 - Low
     - System for incorporating more activitytypes as time goes on (ebike, kayak, swimming, pickleball, etc)
+        - GPS vs Non GPS
+        - ride, run, workout?
     - Like/Seen/Kudos for activities
     - Weekly, Monthly, Yearly stats
 - Long term
