@@ -411,3 +411,19 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
     
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
+
+@app.route(route="echo", methods=[func.HttpMethod.POST])
+def echo(req: func.HttpRequest) -> func.HttpResponse:
+
+    logging.info('called echo')
+
+    try:
+        
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+
+        return func.HttpResponse(req.get_body())
+    
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
