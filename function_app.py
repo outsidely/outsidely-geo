@@ -364,10 +364,6 @@ def validations(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info('called validations')
 
-    auth = authorizer(req)
-    if not auth["authorized"]:
-        return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-
     try:
         
         auth = authorizer(req)
@@ -380,6 +376,38 @@ def validations(req: func.HttpRequest) -> func.HttpResponse:
         data = queryEntities("validations", "PartitionKey eq '" + req.params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": req.params["validationtype"]}, "sort")
 
         return func.HttpResponse(json.dumps(data), status_code=200, mimetype="application/json")
+    
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
+@app.route(route="logo", methods=[func.HttpMethod.GET])
+def logo(req: func.HttpRequest) -> func.HttpResponse:
+
+    logging.info('called logo')
+
+    try:
+        
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+
+        return func.HttpResponse(getBlob("_assets/logo.png"), status_code=200, mimetype="image/*")
+    
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
+@app.route(route="login", methods=[func.HttpMethod.GET])
+def login(req: func.HttpRequest) -> func.HttpResponse:
+
+    logging.info('called login')
+
+    try:
+        
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+
+        return func.HttpResponse('<a href="'+str(req.params.get("redirecturl") or "#")+'">Click here to go back</a>', status_code=200, mimetype="text/html")
     
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
