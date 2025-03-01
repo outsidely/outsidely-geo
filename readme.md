@@ -28,9 +28,52 @@ GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Funct
 
 ### Other CRUD
 
-These all share similar code and routines with customization for some cases (changing password, for example). Create and read will come into existence soon. These will provide access for users, activities, gear, comments, photos, and props eventually.
+These all share similar code and routines with customization for some cases (changing password, for example). These will provide access for users, activities, gear, comments, photos, and props.
+
+### POST /create/gear
+Request
+```json
+{
+    "activitytype": "a valid value from /validations?validationtype=activitytype",
+    "name": "name of the piece of gear"
+}
+```
+Response
+```json
+{
+    "statuscode": 201,
+    "message": "create successful",
+    "gearid": "<gearid>"
+}
+```
+
+### GET /read/gear
+Response
+```json
+[
+    {
+        "timestamp": "2025-03-01T15:50:20.346135+00:00",
+        "activitytype": "ride",
+        "distance": 0,
+        "name": "GT Sensor",
+        "time": 0,
+        "userid": "jamund",
+        "gearid": "088072ad-63b8-4a9b-846a-64ae793cf9e5"
+    },
+    {
+        "timestamp": "2025-03-01T15:23:46.261960+00:00",
+        "activitytype": "ride",
+        "distance": 0,
+        "name": "Transition Sentinel",
+        "time": 0,
+        "userid": "jamund",
+        "gearid": "7d739518-23da-411b-8e35-3b4173ab94bc"
+    }
+]
+```
 
 ### PATCH /update/user/{userid}
+Request
 ```json
 {
     "firstname": "Joe",
@@ -41,6 +84,7 @@ These all share similar code and routines with customization for some cases (cha
 ```
 
 ### PATCH /update/activity/{activityid}
+Request
 ```json
 {
     "activitytype": "a valid value from /validations?validationtype=activitytype",
@@ -49,8 +93,32 @@ These all share similar code and routines with customization for some cases (cha
 }
 ```
 
+### PATCH /update/gear/{gearid}
+Request
+```json
+{
+    "name": "name of the piece of gear",
+    "activitytype": "a valid value from /validations?validationtype=activitytype"
+}
+```
+
 ### DELETE /delete/activity/{activityid}
-- One way door for now
+Response
+```json
+{
+    "statuscode": 200,
+    "message": "delete successful"
+}
+```
+
+### DELETE /delete/gear/{gearid}
+Response
+```json
+{
+    "statuscode": 200,
+    "message": "delete successful"
+}
+```
 
 ## Azure Resources
 - Resource Group: outsidely
@@ -145,7 +213,7 @@ Path is `activityid`\photos\\`photoid`
     - ~~Agree and implement auth scheme - needed for gear, comments, photos, and all user-based preferences~~
 - Medium
     - CRUD outline: https://docs.google.com/spreadsheets/d/1w3IJKmRbWVmeEW3whp3uNintAZ6bExaaPi4kNrGqgR8/edit?usp=sharing 
-        - Gear, Comments, Photos, Props
+        - ~~Gear~~, Comments, Photos, Props
     - Activities response returns laundered information
         - activitytype to label
         - converted values based on metric/imperial selection for a current user
@@ -154,8 +222,9 @@ Path is `activityid`\photos\\`photoid`
 - Low
     - Look at activities as a sort of hierarchy?
         - gps: 1, 0
-        - meatonly: 1, 0
+        - assisted: 0, 1
         - activitytype: feet, wheels, workout
+            - stats happen at this level unless a subtype is requested
         - activitysubtype: run, walk, mountain bike, gravel
     - Weekly, Monthly, Yearly stats
 - Long term
