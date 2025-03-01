@@ -30,7 +30,7 @@ from shapely.geometry import LineString
 from geographiclib.geodesic import Geodesic
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient, BlobClient, ContentSettings
-from azure.data.tables import TableServiceClient, TableClient
+from azure.data.tables import TableServiceClient, TableClient, UpdateMode
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -45,7 +45,6 @@ def createJsonHttpResponse(statuscode, message, properties = {}, headers = {}):
             response[k] = v
     return func.HttpResponse(json.dumps(response), status_code=statuscode, mimetype="application/json", headers=headers)
 
-# should ensure the output is good: everything has timestamp, longitude, latitude, timestamp is in order, longitude and latitude values are in domain
 def parseActivityData(geojson):
     activitydata = []
     priortimestamp = parser.parse("2020-01-01T00:00:00+00:00")
@@ -131,6 +130,11 @@ def upsertEntity(table, entity):
     tableclient = tableserviceclient.get_table_client(table)
     tableclient.upsert_entity(entity)
 
+def deleteEntity(table, partitionkey, rowkey):
+    tableserviceclient = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
+    tableclient = tableserviceclient.get_table_client(table)
+    tableclient.delete_entity(partitionkey, rowkey)
+
 def queryEntities(table, filter, properties = None, aliases = {}, sortproperty = None, sortreverse=False):
     table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
     table_client = table_service_client.get_table_client(table)
@@ -184,7 +188,18 @@ def authorizer(req):
         userid = ""
     return {"authorized": authorized, "userid": userid}
 
-#curl "http://localhost:7071/api/upload" -F upload="@/home/jesse/Downloads/Something_different.gpx" -F userid=jamund -F password=EZmnFTuQPVnCydWCuJVbHpcS5vZvSjKq -F activitytype=Other --output -
+def checkJsonProperties(json, properties, reverse = False):
+    for p in properties:
+        if p not in json.keys():
+            if reverse:
+                return True
+            else:
+                return False
+    if not reverse:
+        return True
+    else:
+        return False
+
 @app.route(route="upload", methods=[func.HttpMethod.POST])
 def upload(req: func.HttpRequest) -> func.HttpResponse:
 
@@ -194,7 +209,7 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
 
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
 
         activityid = str(uuid.uuid4())
 
@@ -202,7 +217,7 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         try:
             upload = req.files["upload"].stream.read()
         except:
-            return createJsonHttpResponse(400, "Missing upload data of activity (GPX file)")
+            return createJsonHttpResponse(400, "missing upload data of activity (GPX file)")
 
         activityproperties = {}
 
@@ -211,7 +226,7 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
             if not validateData("activitytype", activityproperties["activitytype"]):
                 raise
         except:
-            return createJsonHttpResponse(400, "Missing or invalid activitytype")
+            return createJsonHttpResponse(400, "missing or invalid activitytype")
 
         # convert to geojson
         dataframe = pyogrio.read_dataframe(upload, layer="track_points")
@@ -262,7 +277,7 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         # save statistics to tblsvc
         upsertEntity("activities", activityproperties)
 
-        return createJsonHttpResponse(201, "Successfully created activity", {"activityid": activityid})
+        return createJsonHttpResponse(201, "successfully created activity", {"activityid": activityid})
 
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
@@ -276,7 +291,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
 
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
 
         feedresponse = True
         filter = ""
@@ -294,7 +309,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
                 endtime = int(req.params.get("endtime"))
                 starttime = int(req.params.get("starttime"))
                 if (endtime - starttime > delta):
-                    raise Exception("Maximum time delta of " + str(delta) + " for activities")
+                    raise Exception("maximum time delta of " + str(delta) + " for activities")
             else:
                 endtime = int(time.time())
                 starttime = int(endtime - delta)
@@ -332,7 +347,7 @@ def data(req: func.HttpRequest) -> func.HttpResponse:
 
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
 
         if "datatype" not in req.params.keys():
             return createJsonHttpResponse(400, "datatype required")
@@ -368,7 +383,7 @@ def validations(req: func.HttpRequest) -> func.HttpResponse:
         
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
         
         if "validationtype" not in req.params.keys():
             return createJsonHttpResponse(400, "validationtype parameter required")
@@ -389,7 +404,7 @@ def logo(req: func.HttpRequest) -> func.HttpResponse:
         
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
 
         return func.HttpResponse(getBlob("_assets/logo.png"), status_code=200, mimetype="image/*")
     
@@ -405,7 +420,7 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
         
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
 
         return func.HttpResponse('<a href="'+str(req.params.get("redirecturl") or "#")+'">Click here to go back</a>', status_code=200, mimetype="text/html")
     
@@ -421,9 +436,80 @@ def echo(req: func.HttpRequest) -> func.HttpResponse:
         
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "Unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
 
         return func.HttpResponse(req.get_body())
+    
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+    
+@app.route(route="update/{type}/{id}", methods=[func.HttpMethod.PATCH])
+def update(req: func.HttpRequest) -> func.HttpResponse:
+
+    logging.info('called update')
+
+    try:
+        
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+        
+        body = req.get_json()
+        
+        match req.route_params.get("type"):
+            case "user":
+                if len(queryEntities("users", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq 'account'")) == 0:
+                    return createJsonHttpResponse(404, "resource not found")
+                properties = ["firstname", "lastname", "password"]
+                if not checkJsonProperties(body, properties, True):
+                    return createJsonHttpResponse(400, "one or more invalid properties provided, allowed properties are " + ", ".join(properties))
+                body["PartitionKey"] = auth["userid"]
+                body["RowKey"] = "account"
+                if "password" in body.keys():
+                    if len(body["password"]) < 16:
+                        return createJsonHttpResponse(400, "passwords must be at least 16 characters long")
+                    salt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+                    body["password"] = hashlib.sha512(str(salt + body["password"]).encode()).hexdigest()
+                    body["salt"] = salt
+                upsertEntity("users", body)
+            case "activity":
+                if len(queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id")+  "'")) == 0:
+                    return createJsonHttpResponse(404, "resource not found")
+                properties = ["activitytype", "name", "description"]
+                if not checkJsonProperties(body, properties, True):
+                    return createJsonHttpResponse(400, "one or more invalid properties provided, allowed properties are " + ", ".join(properties))
+                if "activitytype" in body.keys():
+                    if not validateData("activitytype", body["activitytype"]):
+                        return createJsonHttpResponse(400, "invalid activitytype")
+                body["PartitionKey"] = auth["userid"]
+                body["RowKey"] = req.route_params.get("id")
+                upsertEntity("activities", body)
+            case _:
+                return createJsonHttpResponse(404, "resource type does not exist")
+
+        return createJsonHttpResponse(200, "update successful")
+    
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
+@app.route(route="delete/{type}/{id}", methods=[func.HttpMethod.DELETE])
+def delete(req: func.HttpRequest) -> func.HttpResponse:
+
+    logging.info('called delete')
+
+    try:
+        
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+
+        match req.route_params.get("type"):
+            case "activity":
+                if len(queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id")+  "'")) == 0:
+                    return createJsonHttpResponse(404, "resource not found")
+                deleteEntity("activities", auth["userid"], req.route_params.get("id"))
+
+        return createJsonHttpResponse(200, "delete successful")
     
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))

@@ -8,7 +8,7 @@ GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Funct
 - Upload a GPX of an activity using multi part form data
 - Required: upload (GPX as binary file), userid, password, activitytype
 - Optional: name, description
-- Successful response `{"statuscode":201,"message": "Successfully created activity","activityid":"faa0c893-7c44-45ae-b618-eab5d03337ad"}`
+- Successful response `{"statuscode":201,"message": "successfully created activity","activityid":"faa0c893-7c44-45ae-b618-eab5d03337ad"}`
 
 ### GET activities
 - Get information about activities with lots of customization for the response
@@ -25,6 +25,29 @@ GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Funct
 - Built as a generic way to have constrained system values.
 - Currently used for activitytypes by calling `/validations?validationtype=activitytypes`
 - Example of future usage `/validations?validationtype=unitsystem`
+
+### CRUDs
+
+#### PATCH /update/{userid}
+```json
+{
+    "firstname": "Joe",
+    "lastname": "Smith",
+    "password": "at least 16 characters long"
+}
+```
+
+#### PATCH /update/{activityid}
+```json
+{
+    "activitytype": "a valid activity type from /validations?validationtype=activitytype",
+    "name": "name of the activity",
+    "description": "description of the activity"
+}
+```
+
+#### DELETE /delete/{activityid}
+- One way door for now
 
 ## Azure Resources
 - Resource Group: outsidely
