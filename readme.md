@@ -204,6 +204,7 @@ Path is `activityid`\photos\\`photoid`
 ## Work Items
 - Unclassified
     - Get outsidely@gmail.com email
+    - Rate limiting for all API calls combined to prevent abuse
 - High
     - ~~Agree and implement auth scheme - needed for gear, comments, photos, and all user-based preferences~~
 - Medium
