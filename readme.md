@@ -26,27 +26,30 @@ GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Funct
 - Currently used for activitytypes by calling `/validations?validationtype=activitytypes`
 - Example of future usage `/validations?validationtype=unitsystem`
 
-### CRUDs
+### Other CRUD
 
-#### PATCH /update/{userid}
+These all share similar code and routines with customization for some cases (changing password, for example). Create and read will come into existence soon. These will provide access for users, activities, gear, comments, photos, and props eventually.
+
+### PATCH /update/{userid}
 ```json
 {
     "firstname": "Joe",
     "lastname": "Smith",
+    "unitsystem": "a valid value from /validations?validationtype=unitsystem",
     "password": "at least 16 characters long"
 }
 ```
 
-#### PATCH /update/{activityid}
+### PATCH /update/{activityid}
 ```json
 {
-    "activitytype": "a valid activity type from /validations?validationtype=activitytype",
+    "activitytype": "a valid value from /validations?validationtype=activitytype",
     "name": "name of the activity",
     "description": "description of the activity"
 }
 ```
 
-#### DELETE /delete/{activityid}
+### DELETE /delete/{activityid}
 - One way door for now
 
 ## Azure Resources
@@ -137,25 +140,30 @@ Path is `activityid`\photos\\`photoid`
 
 ## Work Items
 - Unclassified
+    - Get outsidely@gmail.com email
+- High
+    - ~~Agree and implement auth scheme - needed for gear, comments, photos, and all user-based preferences~~
+- Medium
+    - CRUD outline: https://docs.google.com/spreadsheets/d/1w3IJKmRbWVmeEW3whp3uNintAZ6bExaaPi4kNrGqgR8/edit?usp=sharing 
+        - Gear, Comments, Photos, Props
     - Activities response returns laundered information
         - activitytype to label
         - converted values based on metric/imperial selection for a current user
         - speed/pace depending on activitytype
-- High
-    - ~~Agree and implement auth scheme - needed for gear, comments, photos, and all user-based preferences~~
-- Medium
-    - Gear (create update, delete)
-    - Comments (create, delete)
-    - Photos (create, delete)
     - Map for the activity page w/ elevation profile and linked event support
 - Low
-    - System for incorporating more activitytypes as time goes on (ebike, kayak, swimming, pickleball, etc)
-        - GPS vs Non GPS
-        - ride, run, workout?
-    - Like/Seen/Kudos for activities
+    - Look at activities as a sort of hierarchy?
+        - gps: 1, 0
+        - meatonly: 1, 0
+        - activitytype: feet, wheels, workout
+        - activitysubtype: run, walk, mountain bike, gravel
     - Weekly, Monthly, Yearly stats
 - Long term
     - Moving time
     - Smoothing for elevation
     - Support using DEM-based elevation
     - Privacy zones
+    - Duplicate activity detection
+    - Users get recovery codes since no email / other way to recover
+    - Manual activity entries
+    - Users can generate a code and invite new users (one code per new user)
