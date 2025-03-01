@@ -30,7 +30,7 @@ GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Funct
 
 These all share similar code and routines with customization for some cases (changing password, for example). Create and read will come into existence soon. These will provide access for users, activities, gear, comments, photos, and props eventually.
 
-### PATCH /update/{userid}
+### PATCH /update/user/{userid}
 ```json
 {
     "firstname": "Joe",
@@ -40,7 +40,7 @@ These all share similar code and routines with customization for some cases (cha
 }
 ```
 
-### PATCH /update/{activityid}
+### PATCH /update/activity/{activityid}
 ```json
 {
     "activitytype": "a valid value from /validations?validationtype=activitytype",
@@ -49,7 +49,7 @@ These all share similar code and routines with customization for some cases (cha
 }
 ```
 
-### DELETE /delete/{activityid}
+### DELETE /delete/activity/{activityid}
 - One way door for now
 
 ## Azure Resources
