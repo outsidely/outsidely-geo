@@ -456,7 +456,6 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = gearid
                 body["distance"] = 0
-                body["time"] = 0
                 body["retired"] = "0"
                 upsertEntity("gear", body)
                 id["gearid"] = gearid

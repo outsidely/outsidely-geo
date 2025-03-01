@@ -57,7 +57,6 @@ Response
         "activitytype": "ride",
         "distance": 0,
         "name": "GT Sensor",
-        "time": 0,
         "userid": "jamund",
         "gearid": "088072ad-63b8-4a9b-846a-64ae793cf9e5",
         "retired": 1
@@ -67,7 +66,6 @@ Response
         "activitytype": "ride",
         "distance": 0,
         "name": "Transition Sentinel",
-        "time": 0,
         "userid": "jamund",
         "gearid": "7d739518-23da-411b-8e35-3b4173ab94bc",
         "retired": 0
