@@ -4,27 +4,28 @@ GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Funct
 
 ## APIs
 
-### POST upload
+### POST /upload
 - Upload a GPX of an activity using multi part form data
 - Required: upload (GPX as binary file), userid, password, activitytype
 - Optional: name, description
 - Successful response `{"statuscode":201,"message": "successfully created activity","activityid":"faa0c893-7c44-45ae-b618-eab5d03337ad"}`
 
-### GET activities
+### GET /activities
 - Get information about activities with lots of customization for the response
 - `/activities` will start at the current time and provide a feed of all activities as well as a continuation url to follow for more
 - `/activities?userid=jamund` will create a feed limited to the provided userid
 - `/activities?userid=jamundsen&activityid=d54ece30-8ced-438d-80f8-674bcd45270b` will filter to just one activity
 
-### GET data
+### GET /data/{datatype}/{id}
 - Gets binary data objects stored in blob storage
-- `/data?datatype=preview&activityid=d54ece30-8ced-438d-80f8-674bcd45270b` gets a preview png for an activityid
-- `/data?datatype=geojson&activityid=d54ece30-8ced-438d-80f8-674bcd45270b` gets the raw geojson for an activityid for map display
+- `datatype` is a valid value from `/validate/datatype`
+- `id` is the id of the data to retrieve
+- `/data/preview/d54ece30-8ced-438d-80f8-674bcd45270b` gets a preview for an activityid
+- `/data/geojson/d54ece30-8ced-438d-80f8-674bcd45270b` gets a geojson for an activityid
 
-### GET validations
+### GET /validate/{validationtype}
 - Built as a generic way to have constrained system values.
-- Currently used for activitytypes by calling `/validations?validationtype=activitytypes`
-- Example of future usage `/validations?validationtype=unitsystem`
+- Current validations: validationtype, activitytype, datatype, unitsystem, retired
 
 ### Other CRUD
 
@@ -34,7 +35,7 @@ These all share similar code and routines with customization for some cases (cha
 Request
 ```json
 {
-    "activitytype": "a valid value from /validations?validationtype=activitytype",
+    "activitytype": "a valid value from /validate/activitytype",
     "name": "name of the piece of gear"
 }
 ```
@@ -58,7 +59,8 @@ Response
         "name": "GT Sensor",
         "time": 0,
         "userid": "jamund",
-        "gearid": "088072ad-63b8-4a9b-846a-64ae793cf9e5"
+        "gearid": "088072ad-63b8-4a9b-846a-64ae793cf9e5",
+        "retired": 1
     },
     {
         "timestamp": "2025-03-01T15:23:46.261960+00:00",
@@ -67,7 +69,8 @@ Response
         "name": "Transition Sentinel",
         "time": 0,
         "userid": "jamund",
-        "gearid": "7d739518-23da-411b-8e35-3b4173ab94bc"
+        "gearid": "7d739518-23da-411b-8e35-3b4173ab94bc",
+        "retired": 0
     }
 ]
 ```
@@ -78,7 +81,7 @@ Request
 {
     "firstname": "Joe",
     "lastname": "Smith",
-    "unitsystem": "a valid value from /validations?validationtype=unitsystem",
+    "unitsystem": "a valid value from /validate/unitsystem",
     "password": "at least 16 characters long"
 }
 ```
@@ -87,7 +90,7 @@ Request
 Request
 ```json
 {
-    "activitytype": "a valid value from /validations?validationtype=activitytype",
+    "activitytype": "a valid value from /validate/activitytype",
     "name": "name of the activity",
     "description": "description of the activity"
 }
@@ -98,20 +101,12 @@ Request
 ```json
 {
     "name": "name of the piece of gear",
-    "activitytype": "a valid value from /validations?validationtype=activitytype"
+    "activitytype": "a valid value from /validate/activitytype",
+    "retired": "a valid value from /validate/retired"
 }
 ```
 
 ### DELETE /delete/activity/{activityid}
-Response
-```json
-{
-    "statuscode": 200,
-    "message": "delete successful"
-}
-```
-
-### DELETE /delete/gear/{gearid}
 Response
 ```json
 {

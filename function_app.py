@@ -113,12 +113,15 @@ def saveBlob(data, name, contenttype = None):
         blobclient.upload_blob(data, overwrite=True)
 
 def getBlob(name):
-    blobserviceclient = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
-    blobclient = blobserviceclient.get_blob_client(os.environ["storagecontainer"], name)
-    blob = blobclient.download_blob()
-    data = BytesIO()
-    data = blob.readall()
-    return {"data": data, "contenttype": blob.properties.content_settings["content_type"]}
+    try:
+        blobserviceclient = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
+        blobclient = blobserviceclient.get_blob_client(os.environ["storagecontainer"], name)
+        blob = blobclient.download_blob()
+        data = BytesIO()
+        data = blob.readall()
+        return {"data": data, "contenttype": blob.properties.content_settings["content_type"], "status": True}
+    except:
+        return {"data": None, "contenttype": None, "status": False}
 
 def upsertEntity(table, entity):
     try:
@@ -166,7 +169,7 @@ def tsUnixToIso(ts):
     return datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 def validateData(validationtype, value):
-    eq = queryEntities("validations","PartitionKey eq '" + validationtype + "' and RowKey eq '" + value + "'")
+    eq = queryEntities("validate","PartitionKey eq '" + validationtype + "' and RowKey eq '" + value + "'")
     if len(eq) == 0:
         return False
     else:
@@ -188,8 +191,6 @@ def authorizer(req):
         userid = ""
     return {"authorized": authorized, "userid": userid}
 
-# for each property, check if required, and check if other properties exist or not
-# return list of fields that are required and not provided, and list of fields that were provided but invalid
 def checkJsonProperties(json, properties):
     matched = []
     missing = []
@@ -228,7 +229,6 @@ def checkJsonProperties(json, properties):
                 message += "invalid " + p["name"] + ": " + json[p["name"]] + "."
     return {"missing": missing, "invalid": invalid, "status": status, "message": message}
             
-
 @app.route(route="upload", methods=[func.HttpMethod.POST])
 def upload(req: func.HttpRequest) -> func.HttpResponse:
 
@@ -349,7 +349,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         activities = queryEntities("activities", filter, aliases={"PartitionKey": "userid", "RowKey": "activityid"}, sortproperty="timestamp", sortreverse=True)
         
         for a in activities:
-            a["previewurl"] = "data?datatype=preview&activityid=" + a["activityid"]
+            a["previewurl"] = "data/preview/" + a["activityid"]
             userdata = queryEntities("users","PartitionKey eq '" + a["userid"] + "' and RowKey eq 'account'")
             if len(userdata) > 0:
                 a["firstname"] = userdata[0]["firstname"]
@@ -367,76 +367,40 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
     
-@app.route(route="data", methods=[func.HttpMethod.GET])
+@app.route(route="data/{datatype}/{id}", methods=[func.HttpMethod.GET])
 def data(req: func.HttpRequest) -> func.HttpResponse:
-
     logging.info('called data')
-
     try:
-
         auth = authorizer(req)
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-
-        if "datatype" not in req.params.keys():
-            return createJsonHttpResponse(400, "datatype required")
-        
-        datatype = req.params.get("datatype")
-
+        datatype = req.route_params.get("datatype")
         if not validateData("datatype", datatype):
-            return createJsonHttpResponse(400, "datatype invalid")
-
+            return createJsonHttpResponse(400, "invalid datatype")
         match datatype:
             case "preview":
-                if "activityid" not in req.params.keys():
-                    return createJsonHttpResponse(400, "activityid required")
-                getblob = getBlob(req.params.get("activityid") + "/preview.png")
+                getblob = getBlob(req.route_params.get("id") + "/preview.png")
             case "geojson":
-                if "activityid" not in req.params.keys():
-                    return createJsonHttpResponse(400, "activityid required")
-                getblob = getBlob(req.params.get("activityid") + "/geojson.json")
+                getblob = getBlob(req.route_params.get("id") + "/geojson.json")
             case _:
                 return createJsonHttpResponse(400, "invalid datatype")
-
+        if not getBlob["status"]:
+            return createJsonHttpResponse(404, "data not found")
         return func.HttpResponse(getblob["data"], status_code=200, mimetype=getblob["contenttype"])
-    
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="validations", methods=[func.HttpMethod.GET])
-def validations(req: func.HttpRequest) -> func.HttpResponse:
-
-    logging.info('called validations')
-
+@app.route(route="validate/{validationtype}", methods=[func.HttpMethod.GET])
+def validate(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('called validate')
     try:
-        
         auth = authorizer(req)
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-        
-        if "validationtype" not in req.params.keys():
-            return createJsonHttpResponse(400, "validationtype parameter required")
-        
-        data = queryEntities("validations", "PartitionKey eq '" + req.params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": req.params["validationtype"]}, "sort")
-
+        if not validateData("validationtype", req.route_params.get("validationtype")):
+            return createJsonHttpResponse(400, "invalid validationtype")
+        data = queryEntities("validate", "PartitionKey eq '" + req.route_params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": req.route_params["validationtype"]}, "sort")
         return func.HttpResponse(json.dumps(data), status_code=200, mimetype="application/json")
-    
-    except Exception as ex:
-        return createJsonHttpResponse(500, str(ex))
-
-@app.route(route="logo", methods=[func.HttpMethod.GET])
-def logo(req: func.HttpRequest) -> func.HttpResponse:
-
-    logging.info('called logo')
-
-    try:
-        
-        auth = authorizer(req)
-        if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-
-        return func.HttpResponse(getBlob("_assets/logo.png"), status_code=200, mimetype="image/*")
-    
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
@@ -451,7 +415,7 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
 
-        return func.HttpResponse('<a href="'+str(req.params.get("redirecturl") or "#")+'">Click here to go back</a>', status_code=200, mimetype="text/html")
+        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><body><a href="'+str(req.params.get("redirecturl") or "#")+'">Click here to go back</a></body></html>', status_code=200, mimetype="text/html")
     
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
@@ -493,6 +457,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["RowKey"] = gearid
                 body["distance"] = 0
                 body["time"] = 0
+                body["retired"] = "0"
                 upsertEntity("gear", body)
                 id["gearid"] = gearid
             case _:
@@ -550,9 +515,9 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 body["RowKey"] = req.route_params.get("id")
                 upsertEntity("activities", body)
             case "gear":
-                if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id")+  "'")) == 0:
+                if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id")+  "' and retired eq 0")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
-                cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"}])
+                cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"retired","validate":True}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 body["PartitionKey"] = auth["userid"]
@@ -576,10 +541,6 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 if len(queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id")+  "'")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
                 deleteEntity("activities", auth["userid"], req.route_params.get("id"))
-            case "gear":
-                if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id")+  "'")) == 0:
-                    return createJsonHttpResponse(404, "resource not found")
-                deleteEntity("gear", auth["userid"], req.route_params.get("id"))
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(200, "delete successful")
