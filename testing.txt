@@ -1,0 +1,11 @@
+curl -X POST -H "Authorization: Basic amFtdW5kOnBlbmd1aW5zcGVuZ3VpbnM=" "http://localhost:7071/api/create/gear" -d "{\"activitytype\":\"ride\",\"name\":\"Transition Sentinel\"}"
+
+curl -H "@C:\Temp\auth_outsidely.txt" "http://localhost:7071/api/read/gear"
+
+curl -X PATCH -H "@C:\Temp\auth_outsidely.txt" "http://localhost:7071/api/update/gear/48b82083-e3c7-4f71-a5c0-9361fbec7515" -d "{\"activitytype\":\"ride\",\"name\":\"Transition Sentinel Update\"}"
+
+curl -X DELETE -H "@C:\Temp\auth_outsidely.txt" "http://localhost:7071/api/delete/gear/48b82083-e3c7-4f71-a5c0-9361fbec7515"
+
+curl -H "@C:\Temp\auth_outsidely.txt" "http://localhost:7071/api/read/gear"
+
+curl -H "@C:\Temp\auth_outsidely.txt" "http://localhost:7071/api/validate/validationtype"
