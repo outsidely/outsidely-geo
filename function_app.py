@@ -31,6 +31,7 @@ from geographiclib.geodesic import Geodesic
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient, BlobClient, ContentSettings
 from azure.data.tables import TableServiceClient, TableClient, UpdateMode
+from PIL import Image
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -165,6 +166,20 @@ def queryEntities(table, filter, properties = None, aliases = {}, sortproperty =
             raise Exception("Error in sorting, likely due to missing property in response or entity")
     return response
 
+def incrementDecrement(table, partitionkey, rowkey, property, value):
+    entity = queryEntities(table, "PartitionKey eq '" + partitionkey + "' and RowKey eq '" + rowkey + "'", [property])
+    if len(entity) == 0:
+        raise Exception("entity not found")
+    try:
+        currvalue = float(entity[0][property])
+    except:
+        currvalue = float(0)
+    upsertEntity(table, {
+        "PartitionKey": partitionkey,
+        "RowKey": rowkey,
+        property: currvalue + value
+    })
+
 def tsUnixToIso(ts):
     return datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')
 
@@ -228,7 +243,14 @@ def checkJsonProperties(json, properties):
                     message += " "
                 message += "invalid " + p["name"] + ": " + json[p["name"]] + "."
     return {"missing": missing, "invalid": invalid, "status": status, "message": message}
-            
+
+def resizeImage(img, size, quality):
+    newimg = Image.open(img)
+    newimg.thumbnail(size)
+    outimg = BytesIO()
+    newimg.save(outimg, optimize=True, quality=quality, format="JPEG")
+    return outimg.getvalue()
+
 @app.route(route="upload", methods=[func.HttpMethod.POST])
 def upload(req: func.HttpRequest) -> func.HttpResponse:
 
@@ -252,6 +274,14 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties["activitytype"] = req.form.get("activitytype")
         if not validateData("activitytype", activityproperties["activitytype"]):
             createJsonHttpResponse(400, "invalid or missing activitytype")
+
+        # validate gearid
+        gearid = req.form.get("gearid")
+        if len(gearid) > 0:
+            gearentity = queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + gearid + "' and retired eq '0' and activitytype eq '" + activityproperties["activitytype"] + "'")
+            if len(gearentity) != 1:
+                return createJsonHttpResponse(400, "invalid gearid")
+            activityproperties["gearid"] = gearid
 
         # convert to geojson
         dataframe = pyogrio.read_dataframe(upload, layer="track_points")
@@ -285,7 +315,7 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         saveBlob(json.dumps(activitydata).encode(), activityid + "/activityData.json", "application/json")
         saveBlob(preview.getvalue(), activityid + "/preview.png", "image/png")
 
-        # capture information
+        # capture optional form information
         properties_capture = ["name", "description"]
         formdict = req.form.to_dict()
         for k in formdict.keys():
@@ -298,6 +328,9 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties["ascent"] = statisticsdata["ascent"]
         activityproperties["descent"] = statisticsdata["descent"]
         activityproperties["starttime"] = statisticsdata["starttime"]
+
+        # capture distance for gear
+        incrementDecrement("gear", auth["userid"], gearid, "distance", activityproperties["distance"])
 
         # save statistics to tblsvc
         upsertEntity("activities", activityproperties)
@@ -386,6 +419,46 @@ def data(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
+@app.route(route="media/{activityid}", methods=[func.HttpMethod.POST])
+def media(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('called media')
+    try:
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+        activityid = req.route_params.get("activityid")
+        if len(queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + activityid + "'")) == 0:
+            return createJsonHttpResponse(404, "resource not found")
+        if "upload" not in req.files.keys():
+            return createJsonHttpResponse(400, "missing upload file")
+        mediaid = str(uuid.uuid4())
+        try:
+            upload = req.files["upload"].stream.read()
+            preview = resizeImage(BytesIO(upload), (300, 300), 80)
+            full = resizeImage(BytesIO(upload), (1200, 1200), 95)
+            saveBlob(upload, req.route_params.get("activityid") + "/media/" + mediaid + "_original", req.files["upload"].content_type)
+            saveBlob(preview, req.route_params.get("activityid") + "/media/" + mediaid + "_preview", "image/jpeg")
+            saveBlob(full, req.route_params.get("activityid") + "/media/" + mediaid + "_full", "image/jpeg")
+            qe = queryEntities("media", "PartitionKey eq '" + activityid + "'")
+            primary = 1
+            sort = 0
+            if len(qe) > 1:
+                for e in qe:
+                    if e["sort"] > sort:
+                        sort = e["sort"]
+            upsertEntity("media",{
+                "PartitionKey": activityid,
+                "RowKey": mediaid,
+                "filename": req.files["upload"].filename,
+                "primary": primary,
+                "sort": sort + 1
+            })
+            return createJsonHttpResponse(201, "media successful", {"mediaid": mediaid})
+        except:
+            return createJsonHttpResponse(400, "media unsuccesful due to bad data or misunderstood format")
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
 @app.route(route="validate/{validationtype}", methods=[func.HttpMethod.GET])
 def validate(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called validate')
@@ -451,8 +524,8 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 gearid = str(uuid.uuid4())
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = gearid
-                body["distance"] = 0
-                body["retired"] = "0"
+                body["distance"] = float(0)
+                body["retired"] = str("0")
                 upsertEntity("gear", body)
                 id["gearid"] = gearid
             case _:
@@ -533,8 +606,12 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
         match req.route_params.get("type"):
             case "activity":
-                if len(queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id")+  "'")) == 0:
+                qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id")+  "'")
+                if len(qe) != 1:
                     return createJsonHttpResponse(404, "resource not found")
+                # validate gearid
+                if "gearid" in qe[0].keys():
+                    incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"])
                 deleteEntity("activities", auth["userid"], req.route_params.get("id"))
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")

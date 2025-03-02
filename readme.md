@@ -17,6 +17,18 @@ Response
 }
 ```
 
+### POST /media/{activityid}
+- Can upload images to an activity using multi part form data with the `upload` being an image file
+
+Response 
+```json
+{
+    "statuscode": 201,
+    "message": "media successful",
+    "mediaid": "37bb5bd8-4312-4a39-bce6-d8a9fec6e833"
+}
+```
+
 ### GET /activities
 - Get information about activities with lots of customization for the response
 - `/activities` will start at the current time and provide a feed of all activities as well as a continuation url to follow for more
