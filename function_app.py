@@ -247,15 +247,11 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
             upload = req.files["upload"].stream.read()
         except:
             return createJsonHttpResponse(400, "missing upload data of activity (GPX file)")
-
+        
         activityproperties = {}
-
-        try:
-            activityproperties["activitytype"] = req.form.get("activitytype")
-            if not validateData("activitytype", activityproperties["activitytype"]):
-                raise
-        except:
-            return createJsonHttpResponse(400, "missing or invalid activitytype")
+        activityproperties["activitytype"] = req.form.get("activitytype")
+        if not validateData("activitytype", activityproperties["activitytype"]):
+            createJsonHttpResponse(400, "invalid or missing activitytype")
 
         # convert to geojson
         dataframe = pyogrio.read_dataframe(upload, layer="track_points")

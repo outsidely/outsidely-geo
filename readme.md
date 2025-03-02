@@ -1,14 +1,21 @@
 # outsidely-geo
 
-GIS, data analysis, and web APIs for the outsidely project. Utilizes Azure Functions, Azure Table Service, and Azure Blob Storage.
+GIS, data analysis, and APIs for the outsidely project. Utilizes Azure Functions, Azure Table Service, and Azure Blob Storage.
 
 ## APIs
 
 ### POST /upload
 - Upload a GPX of an activity using multi part form data
-- Required: upload (GPX as binary file), userid, password, activitytype
+- Required: upload (GPX as binary file), activitytype
 - Optional: name, description
-- Successful response `{"statuscode":201,"message": "successfully created activity","activityid":"faa0c893-7c44-45ae-b618-eab5d03337ad"}`
+
+Response 
+```json
+{
+    "statuscode":201
+    ,"message": "successfully created activity","activityid":"faa0c893-7c44-45ae-b618-eab5d03337ad"
+}
+```
 
 ### GET /activities
 - Get information about activities with lots of customization for the response
