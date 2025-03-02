@@ -71,7 +71,7 @@ def parseActivityData(geojson):
             except:
                 ex = True
             activitydata.append(properties)
-    return activitydata
+    return {"version": 1, "data": activitydata}
 
 def parseStatisticsData(activitydata):
 
@@ -101,6 +101,8 @@ def parseStatisticsData(activitydata):
     statisticsdata["distance"] = distance
     statisticsdata["ascent"] = ascent
     statisticsdata["descent"] = descent
+
+    statisticsdata["version"] = 1
 
     return statisticsdata
 
@@ -276,7 +278,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
             createJsonHttpResponse(400, "invalid or missing activitytype")
 
         # validate gearid
-        gearid = req.form.get("gearid")
+        gearid = str(req.form.get("gearid") or "")
         if len(gearid) > 0:
             gearentity = queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + gearid + "' and retired eq '0' and activitytype eq '" + activityproperties["activitytype"] + "'")
             if len(gearentity) != 1:
@@ -292,28 +294,28 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         activitydata = parseActivityData(json.loads(geojson.getvalue().decode()))
         
         # calculate statistics
-        statisticsdata = parseStatisticsData(activitydata)
+        statisticsdata = parseStatisticsData(activitydata["data"])
 
         # create clean track file
         points = []
-        for point in activitydata:
+        for point in activitydata["data"]:
             points.append([point["longitude"],point["latitude"]])
         route = geopandas.GeoSeries([LineString(points)])
         routejson = json.loads(route.to_json())
 
         # create preview
         routejsonsimplified = json.loads(route.simplify(.0001).to_json())
-        m = StaticMap(360, 360, padding_x=10, padding_y=10, url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
+        m = StaticMap(300, 300, padding_x=10, padding_y=10, url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
         m.add_line(Line(routejsonsimplified["features"][0]["geometry"]["coordinates"], 'red', 3))
         preview = BytesIO()
         image = m.render()
-        image.save(preview, format="png")
+        image.save(preview, optimize=True, quality=99, format="JPEG")
 
         # save file, geojson, activityData, preview to storage container
         saveBlob(upload, activityid + "/source.gpx", "application/gpx+xml")
         saveBlob(json.dumps(routejson).encode(), activityid + "/geojson.json", "application/json")
-        saveBlob(json.dumps(activitydata).encode(), activityid + "/activityData.json", "application/json")
-        saveBlob(preview.getvalue(), activityid + "/preview.png", "image/png")
+        saveBlob(json.dumps(activitydata).encode(), activityid + "/activitydata.json", "application/json")
+        saveBlob(preview.getvalue(), activityid + "/preview.jpg", "image/jpeg")
 
         # capture optional form information
         properties_capture = ["name", "description"]
@@ -330,12 +332,13 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties["starttime"] = statisticsdata["starttime"]
 
         # capture distance for gear
-        incrementDecrement("gear", auth["userid"], gearid, "distance", activityproperties["distance"])
+        if len(gearid) > 0:
+            incrementDecrement("gear", auth["userid"], gearid, "distance", activityproperties["distance"])
 
         # save statistics to tblsvc
         upsertEntity("activities", activityproperties)
 
-        return createJsonHttpResponse(201, "successfully created activity", {"activityid": activityid})
+        return createJsonHttpResponse(201, "successfully uploaded activity", {"activityid": activityid})
 
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
@@ -374,7 +377,7 @@ def uploadmedia(req: func.HttpRequest) -> func.HttpResponse:
                 "primary": primary,
                 "sort": sort + 1
             })
-            return createJsonHttpResponse(201, "media successful", {"mediaid": mediaid})
+            return createJsonHttpResponse(201, "successfully uploaded media", {"mediaid": mediaid})
         except:
             return createJsonHttpResponse(400, "media unsuccesful due to bad data or misunderstood format")
     except Exception as ex:
@@ -449,7 +452,7 @@ def data(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(400, "invalid datatype")
         match datatype:
             case "preview":
-                getblob = getBlob(req.route_params.get("id") + "/preview.png")
+                getblob = getBlob(req.route_params.get("id") + "/preview.jpg")
             case "geojson":
                 getblob = getBlob(req.route_params.get("id") + "/geojson.json")
             case _:

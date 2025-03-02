@@ -5,4 +5,4 @@ if [ $# -eq 0 ]; then
   exit 1
 fi
 
-curl "http://localhost:7071/api/upload" -F upload="@$1" -F userid="$2" -F password="$3" -F activitytype="$4" --output -
+curl "http://localhost:7071/api/upload/activity" -F upload="@$1" -H "@:C:\Temo\auth_outsidely.txt" -F activitytype="$4" --output -

@@ -5,4 +5,4 @@ if [ $# -eq 0 ]; then
   exit 1
 fi
 
-curl "https://outsidely-geo-app.azurewebsites.net/api/upload" -F upload="@$1" -F userid="$2" -F password="$3" -F activitytype="$4" --output -
+curl "https://outsidely-geo-app.azurewebsites.net/api/upload/activity" -F upload="@$1" -F userid="$2" -F password="$3" -F activitytype="$4" --output -

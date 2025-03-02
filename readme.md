@@ -4,7 +4,7 @@ GIS, data analysis, and APIs for the outsidely project. Utilizes Azure Functions
 
 ## APIs
 
-### POST /upload
+### POST /upload/activity
 - Upload a GPX of an activity using multi part form data
 - Required: upload (GPX as binary file), activitytype
 - Optional: name, description
@@ -12,19 +12,20 @@ GIS, data analysis, and APIs for the outsidely project. Utilizes Azure Functions
 Response 
 ```json
 {
-    "statuscode":201
-    ,"message": "successfully created activity","activityid":"faa0c893-7c44-45ae-b618-eab5d03337ad"
+    "statuscode":201,
+    "message": "successfully uploaded activity",
+    "activityid":"faa0c893-7c44-45ae-b618-eab5d03337ad"
 }
 ```
 
-### POST /media/{activityid}
+### POST /upload/media/{activityid}
 - Can upload images to an activity using multi part form data with the `upload` being an image file
 
 Response 
 ```json
 {
     "statuscode": 201,
-    "message": "media successful",
+    "message": "successfully uploaded media",
     "mediaid": "37bb5bd8-4312-4a39-bce6-d8a9fec6e833"
 }
 ```
@@ -146,15 +147,18 @@ Objects should be in the array ordered by timestamp.
 - **latitude** - number - required - WGS84 Latitude
 - **elevation** - number - Elevation in meters
 ```javascript
-[
-    {
-        "timestamp": "2019-11-14T00:55:31.820Z",
-        "longitude": -84.73334,
-        "latitude": 34.9392932,
-        "elevation": 382.98
-    },
-    ...
-]
+{
+    "version" 1,
+    "data": [
+        {
+            "timestamp": "2019-11-14T00:55:31.820Z",
+            "longitude": -84.73334,
+            "latitude": 34.9392932,
+            "elevation": 382.98
+        },
+        ...
+    ]
+}
 ```
 
 ### Statistics Data
@@ -164,6 +168,7 @@ Objects should be in the array ordered by timestamp.
 - **descent** - number - Total descent of the activity in meters
 ```javascript
 {
+    "version": 1
     "time": 9786,
     "distance": 14361.84244,
     "ascent": 588.402,
