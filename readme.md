@@ -29,11 +29,10 @@ Response
 }
 ```
 
-### GET /activities
-- Get information about activities with lots of customization for the response
+### GET /activities/{userid?}/{activityid?}
 - `/activities` will start at the current time and provide a feed of all activities as well as a continuation url to follow for more
-- `/activities?userid=jamund` will create a feed limited to the provided userid
-- `/activities?userid=jamundsen&activityid=d54ece30-8ced-438d-80f8-674bcd45270b` will filter to just one activity
+- `/activities/{userid}` will create a feed limited to the provided userid
+- `/activities/{userid}/{activityid}` will filter to just one activity
 
 ### GET /data/{datatype}/{id}
 - Gets binary data objects stored in blob storage

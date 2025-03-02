@@ -251,10 +251,10 @@ def resizeImage(img, size, quality):
     newimg.save(outimg, optimize=True, quality=quality, format="JPEG")
     return outimg.getvalue()
 
-@app.route(route="upload", methods=[func.HttpMethod.POST])
-def upload(req: func.HttpRequest) -> func.HttpResponse:
+@app.route(route="upload/activity", methods=[func.HttpMethod.POST])
+def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
 
-    logging.info('called upload')
+    logging.info('called uploadactivity')
 
     try:
 
@@ -340,88 +340,9 @@ def upload(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="activities", methods=[func.HttpMethod.GET])
-def activities(req: func.HttpRequest) -> func.HttpResponse:
-
-    logging.info('called activities')
-
-    try:
-
-        auth = authorizer(req)
-        if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-
-        feedresponse = True
-        filter = ""
-
-        if "activityid" in req.params.keys() and "userid" not in req.params.keys():
-            return createJsonHttpResponse(400, "activityid must be accompanied by a userid")
-        elif "activityid" in req.params.keys() and "userid" in req.params.keys():
-            feedresponse = False
-            filter +=  "PartitionKey eq '" + req.params.get("userid") + "'" + " and RowKey eq '" + req.params.get("activityid") + "'"
-        else:
-            delta = 86400*7
-            endtime = 0
-            starttime = 0
-            if "endtime" in req.params.keys() and "starttime" in req.params.keys():
-                endtime = int(req.params.get("endtime"))
-                starttime = int(req.params.get("starttime"))
-                if (endtime - starttime > delta):
-                    raise Exception("maximum time delta of " + str(delta) + " for activities")
-            else:
-                endtime = int(time.time())
-                starttime = int(endtime - delta)
-            filter += "Timestamp le datetime'" + tsUnixToIso(endtime) + "' and Timestamp ge datetime'" + tsUnixToIso(starttime) + "'"
-            if "userid" in req.params.keys():
-                filter += " and PartitionKey eq '" + req.params.get("userid") + "'"
-
-        activities = queryEntities("activities", filter, aliases={"PartitionKey": "userid", "RowKey": "activityid"}, sortproperty="timestamp", sortreverse=True)
-        
-        for a in activities:
-            a["previewurl"] = "data/preview/" + a["activityid"]
-            userdata = queryEntities("users","PartitionKey eq '" + a["userid"] + "' and RowKey eq 'account'")
-            if len(userdata) > 0:
-                a["firstname"] = userdata[0]["firstname"]
-                a["lastname"] = userdata[0]["lastname"]
-        
-        response = {"activities": activities}
-        if feedresponse:
-            nexturl = "activities?endtime=" +str(starttime) + "&starttime=" + str(starttime - delta)
-            if "userid" in req.params.keys():
-                nexturl += "&userid=" + req.params.get("userid")
-            response["nexturl"] = nexturl
-
-        return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
-
-    except Exception as ex:
-        return createJsonHttpResponse(500, str(ex))
-    
-@app.route(route="data/{datatype}/{id}", methods=[func.HttpMethod.GET])
-def data(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('called data')
-    try:
-        auth = authorizer(req)
-        if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-        datatype = req.route_params.get("datatype")
-        if not validateData("datatype", datatype):
-            return createJsonHttpResponse(400, "invalid datatype")
-        match datatype:
-            case "preview":
-                getblob = getBlob(req.route_params.get("id") + "/preview.png")
-            case "geojson":
-                getblob = getBlob(req.route_params.get("id") + "/geojson.json")
-            case _:
-                return createJsonHttpResponse(400, "invalid datatype")
-        if not getBlob["status"]:
-            return createJsonHttpResponse(404, "data not found")
-        return func.HttpResponse(getblob["data"], status_code=200, mimetype=getblob["contenttype"])
-    except Exception as ex:
-        return createJsonHttpResponse(500, str(ex))
-
-@app.route(route="media/{activityid}", methods=[func.HttpMethod.POST])
-def media(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('called media')
+@app.route(route="upload/media/{activityid}", methods=[func.HttpMethod.POST])
+def uploadmedia(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('called uploadmedia')
     try:
         auth = authorizer(req)
         if not auth["authorized"]:
@@ -456,6 +377,86 @@ def media(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(201, "media successful", {"mediaid": mediaid})
         except:
             return createJsonHttpResponse(400, "media unsuccesful due to bad data or misunderstood format")
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
+@app.route(route="activities/{userid?}/{activityid?}", methods=[func.HttpMethod.GET])
+def activities(req: func.HttpRequest) -> func.HttpResponse:
+
+    logging.info('called activities')
+
+    try:
+
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+
+        feedresponse = True
+        filter = ""
+
+        if "activityid" in req.route_params.keys() and "userid" not in req.route_params.keys():
+            return createJsonHttpResponse(400, "activityid must be accompanied by a userid")
+        elif "activityid" in req.route_params.keys() and "userid" in req.route_params.keys():
+            feedresponse = False
+            filter +=  "PartitionKey eq '" + req.route_params.get("userid") + "'" + " and RowKey eq '" + req.route_params.get("activityid") + "'"
+        else:
+            delta = 86400*7
+            endtime = 0
+            starttime = 0
+            if "endtime" in req.params.keys() and "starttime" in req.params.keys():
+                endtime = int(req.params.get("endtime"))
+                starttime = int(req.params.get("starttime"))
+                if (endtime - starttime > delta):
+                    raise Exception("maximum time delta of " + str(delta) + " for activities")
+            else:
+                endtime = int(time.time())
+                starttime = int(endtime - delta)
+            filter += "Timestamp le datetime'" + tsUnixToIso(endtime) + "' and Timestamp ge datetime'" + tsUnixToIso(starttime) + "'"
+            if "userid" in req.params.keys():
+                filter += " and PartitionKey eq '" + req.route_params.get("userid") + "'"
+
+        activities = queryEntities("activities", filter, aliases={"PartitionKey": "userid", "RowKey": "activityid"}, sortproperty="timestamp", sortreverse=True)
+        
+        for a in activities:
+            a["previewurl"] = "data/preview/" + a["activityid"]
+            userdata = queryEntities("users","PartitionKey eq '" + a["userid"] + "' and RowKey eq 'account'")
+            if len(userdata) > 0:
+                a["firstname"] = userdata[0]["firstname"]
+                a["lastname"] = userdata[0]["lastname"]
+        
+        response = {"activities": activities}
+        if feedresponse:
+            nexturl = "activities"
+            if "userid" in req.route_params.keys():
+                nexturl += "/" + req.route_params.get("userid")
+            nexturl += "?endtime=" +str(starttime) + "&starttime=" + str(starttime - delta)
+            response["nexturl"] = nexturl
+
+        return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
+
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+    
+@app.route(route="data/{datatype}/{id}", methods=[func.HttpMethod.GET])
+def data(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('called data')
+    try:
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+        datatype = req.route_params.get("datatype")
+        if not validateData("datatype", datatype):
+            return createJsonHttpResponse(400, "invalid datatype")
+        match datatype:
+            case "preview":
+                getblob = getBlob(req.route_params.get("id") + "/preview.png")
+            case "geojson":
+                getblob = getBlob(req.route_params.get("id") + "/geojson.json")
+            case _:
+                return createJsonHttpResponse(400, "invalid datatype")
+        if not getBlob["status"]:
+            return createJsonHttpResponse(404, "data not found")
+        return func.HttpResponse(getblob["data"], status_code=200, mimetype=getblob["contenttype"])
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
