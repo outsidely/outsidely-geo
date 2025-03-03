@@ -472,9 +472,8 @@ def data(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(400, "invalid datatype")
         match datatype:
             case "preview":
-                try:
-                    gb = getBlob(req.route_params.get("id") + "/preview.jpg")
-                except:
+                gb = getBlob(req.route_params.get("id") + "/preview.jpg")
+                if not gb["status"]:
                     gb = getBlob(req.route_params.get("id") + "/preview.png")
             case "geojson":
                 gb = getBlob(req.route_params.get("id") + "/geojson.json")
