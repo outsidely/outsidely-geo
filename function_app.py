@@ -116,15 +116,12 @@ def saveBlob(data, name, contenttype = None):
         blobclient.upload_blob(data, overwrite=True)
 
 def getBlob(name):
-    try:
-        blobserviceclient = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
-        blobclient = blobserviceclient.get_blob_client(os.environ["storagecontainer"], name)
-        blob = blobclient.download_blob()
-        data = BytesIO()
-        data = blob.readall()
-        return {"data": data, "contenttype": blob.properties.content_settings["content_type"], "status": True}
-    except:
-        return {"data": None, "contenttype": None, "status": False}
+    blobserviceclient = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
+    blobclient = blobserviceclient.get_blob_client(os.environ["storagecontainer"], name)
+    blob = blobclient.download_blob()
+    data = BytesIO()
+    data = blob.readall()
+    return {"data": data, "contenttype": blob.properties.content_settings["content_type"], "status": True}
 
 def upsertEntity(table, entity):
     try:
@@ -452,14 +449,17 @@ def data(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(400, "invalid datatype")
         match datatype:
             case "preview":
-                getblob = getBlob(req.route_params.get("id") + "/preview.jpg")
+                try:
+                    gb = getBlob(req.route_params.get("id") + "/preview.jpg")
+                except:
+                    gb = getBlob(req.route_params.get("id") + "/preview.png")
             case "geojson":
-                getblob = getBlob(req.route_params.get("id") + "/geojson.json")
+                gb = getBlob(req.route_params.get("id") + "/geojson.json")
             case _:
                 return createJsonHttpResponse(400, "invalid datatype")
-        if not getBlob["status"]:
+        if not gb["status"]:
             return createJsonHttpResponse(404, "data not found")
-        return func.HttpResponse(getblob["data"], status_code=200, mimetype=getblob["contenttype"])
+        return func.HttpResponse(gb["data"], status_code=200, mimetype=gb["contenttype"])
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
