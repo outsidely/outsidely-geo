@@ -146,6 +146,15 @@ Response
 }
 ```
 
+### DELETE /delete/media/{activityid}/{mediaid}
+Response
+```json
+{
+    "statuscode": 200,
+    "message": "delete successful"
+}
+```
+
 ## Azure Resources
 - Resource Group: outsidely
 - Function App: outsidely-app-geo
