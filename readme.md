@@ -73,7 +73,7 @@ Response
 ### GET /read/gear
 Response
 ```json
-[
+{"gear":[
     {
         "timestamp": "2025-03-01T15:50:20.346135+00:00",
         "activitytype": "ride",
@@ -92,7 +92,7 @@ Response
         "gearid": "7d739518-23da-411b-8e35-3b4173ab94bc",
         "retired": 0
     }
-]
+]}
 ```
 
 ### PATCH /update/user/{userid}
@@ -240,7 +240,7 @@ Objects should be in the array ordered by timestamp.
 Files stored in path of `activityid`
 - `source.gpx` - Source file of the activity
 - `geojson.json` - GeoJSON file for mapping (geojson)
-- `activityData.json` - Custom activity model (json)
+- `activitydata.json` - Custom activity model (json)
 
 ### Photos
 Path is `activityid`\photos\\`photoid`
@@ -249,6 +249,7 @@ Path is `activityid`\photos\\`photoid`
 - Unclassified
     - Get outsidely@gmail.com email
     - Rate limiting for all API calls combined to prevent abuse
+    - Deletions table that logs primarykey=userid,rowkey=idtype (userid, activityid, mediaid, commentid, propid)
 - High
     - ~~Agree and implement auth scheme - needed for gear, comments, photos, and all user-based preferences~~
 - Medium

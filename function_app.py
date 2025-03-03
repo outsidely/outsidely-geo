@@ -573,7 +573,7 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
         match req.route_params.get("type"):
             case "gear":
-                return func.HttpResponse(json.dumps(queryEntities("gear","PartitionKey eq '" + auth["userid"] + "'", aliases={"PartitionKey":"userid","RowKey":"gearid"}, sortproperty="timestamp", sortreverse=True)), status_code=200, mimetype="application/json")
+                return func.HttpResponse(json.dumps({"gear":queryEntities("gear","PartitionKey eq '" + auth["userid"] + "'", aliases={"PartitionKey":"userid","RowKey":"gearid"}, sortproperty="timestamp", sortreverse=True)}), status_code=200, mimetype="application/json")
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
     except Exception as ex:
