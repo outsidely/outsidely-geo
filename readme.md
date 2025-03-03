@@ -19,7 +19,7 @@ Response
 ```
 
 ### POST /upload/media/{activityid}
-- Can upload images to an activity using multi part form data with the `upload` being an image file
+- Can upload images to an activity using multi part form data with the `upload` value being an image file
 
 Response 
 ```json
@@ -35,12 +35,15 @@ Response
 - `/activities/{userid}` will create a feed limited to the provided userid
 - `/activities/{userid}/{activityid}` will filter to just one activity
 
-### GET /data/{datatype}/{id}
+### GET /data/{datatype}/{id}/{id2?}
 - Gets binary data objects stored in blob storage
 - `datatype` is a valid value from `/validate/datatype`
 - `id` is the id of the data to retrieve
-- `/data/preview/d54ece30-8ced-438d-80f8-674bcd45270b` gets a preview for an activityid
-- `/data/geojson/d54ece30-8ced-438d-80f8-674bcd45270b` gets a geojson for an activityid
+- `id2` is optional for pulling nested data in some cases
+- `/data/preview/{activityid}` gets a preview for an activityid
+- `/data/geojson/{activityid}` gets a geojson for an activityid
+- `/data/mediapreview/{activityid}/{mediaid}` gets a preview size media object
+- `/data/mediafull/{activityid}/{mediaid}` gets a full size media object
 
 ### GET /validate/{validationtype}
 - Built as a generic way to have constrained system values.
@@ -120,6 +123,17 @@ Request
     "name": "name of the piece of gear",
     "activitytype": "a valid value from /validate/activitytype",
     "retired": "a valid value from /validate/retired"
+}
+```
+
+### PATCH /update/media/{activityid}/{mediaid}
+Request
+- primarytype can only be "1" if provided - all other media will be set to primarytype="0"
+- sort is an integer in the range of current sort values for the given activityid, issuing a new sort will _swap_ the sort values
+```json
+{
+    "primarytype": "1",
+    "sort": 3
 }
 ```
 

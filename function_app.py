@@ -116,12 +116,24 @@ def saveBlob(data, name, contenttype = None):
         blobclient.upload_blob(data, overwrite=True)
 
 def getBlob(name):
-    blobserviceclient = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
-    blobclient = blobserviceclient.get_blob_client(os.environ["storagecontainer"], name)
-    blob = blobclient.download_blob()
-    data = BytesIO()
-    data = blob.readall()
-    return {"data": data, "contenttype": blob.properties.content_settings["content_type"], "status": True}
+    try:
+        blobserviceclient = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
+        blobclient = blobserviceclient.get_blob_client(os.environ["storagecontainer"], name)
+        blob = blobclient.download_blob()
+        data = BytesIO()
+        data = blob.readall()
+        return {"data": data, "contenttype": blob.properties.content_settings["content_type"], "status": True}
+    except:
+        return {"data": None, "contenttype": None, "status": False}
+
+def deleteBlob(name):
+    try:
+        blobserviceclient = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
+        blobclient = blobserviceclient.get_blob_client(os.environ["storagecontainer"], name)
+        blobclient.delete_blob()
+    except:
+        return False
+    return True
 
 def upsertEntity(table, entity):
     try:
@@ -361,9 +373,10 @@ def uploadmedia(req: func.HttpRequest) -> func.HttpResponse:
             saveBlob(preview, req.route_params.get("activityid") + "/media/" + mediaid + "_preview", "image/jpeg")
             saveBlob(full, req.route_params.get("activityid") + "/media/" + mediaid + "_full", "image/jpeg")
             qe = queryEntities("media", "PartitionKey eq '" + activityid + "'")
-            primary = 1
+            primarytype = "1"
             sort = 0
-            if len(qe) > 1:
+            if len(qe) > 0:
+                primarytype = "0"
                 for e in qe:
                     if e["sort"] > sort:
                         sort = e["sort"]
@@ -371,7 +384,7 @@ def uploadmedia(req: func.HttpRequest) -> func.HttpResponse:
                 "PartitionKey": activityid,
                 "RowKey": mediaid,
                 "filename": req.files["upload"].filename,
-                "primary": primary,
+                "primarytype": str(primarytype),
                 "sort": sort + 1
             })
             return createJsonHttpResponse(201, "successfully uploaded media", {"mediaid": mediaid})
@@ -437,7 +450,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
     
-@app.route(route="data/{datatype}/{id}", methods=[func.HttpMethod.GET])
+@app.route(route="data/{datatype}/{id}/{id2?}", methods=[func.HttpMethod.GET])
 def data(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called data')
     try:
@@ -455,6 +468,10 @@ def data(req: func.HttpRequest) -> func.HttpResponse:
                     gb = getBlob(req.route_params.get("id") + "/preview.png")
             case "geojson":
                 gb = getBlob(req.route_params.get("id") + "/geojson.json")
+            case "mediapreview":
+                gb = getBlob(req.route_params.get("id") + "/media/" + req.route_params.get("id2") + "_preview")
+            case "mediafull":
+                gb = getBlob(req.route_params.get("id") + "/media/" + req.route_params.get("id2") + "_full")
             case _:
                 return createJsonHttpResponse(400, "invalid datatype")
         if not gb["status"]:
@@ -553,7 +570,7 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="update/{type}/{id}", methods=[func.HttpMethod.PATCH])
+@app.route(route="update/{type}/{id}/{id2?}", methods=[func.HttpMethod.PATCH])
 def update(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called update')
     try:
@@ -578,7 +595,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                     body["salt"] = salt
                 upsertEntity("users", body)
             case "activity":
-                if len(queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id")+  "'")) == 0:
+                if len(queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
                 cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"description"}])
                 if not cjp["status"]:
@@ -587,7 +604,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 body["RowKey"] = req.route_params.get("id")
                 upsertEntity("activities", body)
             case "gear":
-                if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id")+  "' and retired eq 0")) == 0:
+                if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "' and retired eq 0")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
                 cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"retired","validate":True}])
                 if not cjp["status"]:
@@ -595,13 +612,42 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = req.route_params.get("id")
                 upsertEntity("gear", body)
+            case "media":
+                if len(queryEntities("activities", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
+                    return createJsonHttpResponse(404, "resource not found")
+                qe = queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'")
+                if len(qe) == 0:
+                    return createJsonHttpResponse(404, "resource not found")
+                cjp = checkJsonProperties(body, [{"name":"primarytype","validate":True},{"name":"sort"}])
+                if not cjp["status"]:
+                    return createJsonHttpResponse(400, cjp["message"])
+                oldsort = qe[0].get("sort")
+                qe = queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey ne '" + req.route_params.get("id2") + "'", aliases={"PartitionKey":"activityid","RowKey":"mediaid"})
+                for e in qe:
+                    if "primarytype" in body.keys():
+                        if e["primarytype"] == "1":
+                            upsertEntity("media", {
+                                "PartitionKey": e["activityid"],
+                                "RowKey": e["mediaid"],
+                                "primarytype": "0"
+                            })
+                    if "sort" in body.keys():
+                        if e["sort"] == body["sort"]:
+                            upsertEntity("media", {
+                                "PartitionKey": e["activityid"],
+                                "RowKey": e["mediaid"],
+                                "sort": oldsort
+                            })
+                body["PartitionKey"] = req.route_params.get("id")
+                body["RowKey"] = req.route_params.get("id2")
+                upsertEntity("media", body)
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(200, "update successful")
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="delete/{type}/{id}", methods=[func.HttpMethod.DELETE])
+@app.route(route="delete/{type}/{id}/{id2?}", methods=[func.HttpMethod.DELETE])
 def delete(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called delete')
     try:
@@ -617,6 +663,14 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 if "gearid" in qe[0].keys():
                     incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"])
                 deleteEntity("activities", auth["userid"], req.route_params.get("id"))
+            case "media":
+                qe = queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'")
+                if len(qe) != 1:
+                    return createJsonHttpResponse(404, "resource not found")
+                deleteEntity("media", req.route_params.get("id"), req.route_params.get("id2"))
+                deleteBlob(req.route_params.get("id") + "/media/" + req.route_params.get("id2") + "_original")
+                deleteBlob(req.route_params.get("id") + "/media/" + req.route_params.get("id2") + "_preview")
+                deleteBlob(req.route_params.get("id") + "/media/" + req.route_params.get("id2") + "_full")
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(200, "delete successful")
