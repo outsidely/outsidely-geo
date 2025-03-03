@@ -425,17 +425,27 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
                 endtime = int(time.time())
                 starttime = int(endtime - delta)
             filter += "Timestamp le datetime'" + tsUnixToIso(endtime) + "' and Timestamp ge datetime'" + tsUnixToIso(starttime) + "'"
-            if "userid" in req.params.keys():
+            if "userid" in req.route_params.keys():
                 filter += " and PartitionKey eq '" + req.route_params.get("userid") + "'"
 
         activities = queryEntities("activities", filter, aliases={"PartitionKey": "userid", "RowKey": "activityid"}, sortproperty="timestamp", sortreverse=True)
+
+        userdata = {}
         
         for a in activities:
             a["previewurl"] = "data/preview/" + a["activityid"]
-            userdata = queryEntities("users","PartitionKey eq '" + a["userid"] + "' and RowKey eq 'account'")
+            if a["userid"] not in userdata.keys():
+                qu = queryEntities("users","PartitionKey eq '" + a["userid"] + "' and RowKey eq 'account'")
+                userdata[a["userid"]] = {"firstname": qu[0]["firstname"], "lastname": qu[0]["lastname"]}
             if len(userdata) > 0:
-                a["firstname"] = userdata[0]["firstname"]
-                a["lastname"] = userdata[0]["lastname"]
+                a["firstname"] = userdata[a["userid"]]["firstname"]
+                a["lastname"] = userdata[a["userid"]]["lastname"]
+            # add media if exists (in fugure use increment/decrement on activity to know when to query and optimize)
+            qm = queryEntities("media", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey", "Timestamp", "primarytype","sort"], {"RowKey": "mediaid"}, "sort")
+            for qme in qm:
+                qme["mediapreviewurl"] = "data/mediapreview/" + a["activityid"] + "/" + qme["mediaid"]
+                qme["mediafullurl"] = "data/mediafull/" + a["activityid"] + "/" + qme["mediaid"]
+            a["media"] = qm
         
         response = {"activities": activities}
         if feedresponse:

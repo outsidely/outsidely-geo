@@ -12,9 +12,9 @@ GIS, data analysis, and APIs for the outsidely project. Utilizes Azure Functions
 Response 
 ```json
 {
-    "statuscode":201,
+    "statuscode": 201,
     "message": "successfully uploaded activity",
-    "activityid":"faa0c893-7c44-45ae-b618-eab5d03337ad"
+    "activityid": "faa0c893-7c44-45ae-b618-eab5d03337ad"
 }
 ```
 
@@ -47,7 +47,7 @@ Response
 
 ### GET /validate/{validationtype}
 - Built as a generic way to have constrained system values.
-- Current validations: validationtype, activitytype, datatype, unitsystem, retired
+- Current validations: validationtype, activitytype, datatype, unitsystem, retired, primarytype
 
 ### Other CRUD
 
