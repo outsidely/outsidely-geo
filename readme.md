@@ -200,62 +200,21 @@ Objects should be in the array ordered by timestamp.
 }
 ```
 
-## Tables
+## Tables / Storage / CRUD Outline
 
-### Users
-- PartitionKey `userid`
-- RowKey `account`
-    - email
-    - firstname
-    - lastname
-    - timezone
-    - avatar (blob storage)
-
-### Activities
-- PartitionKey `userid`
-- RowKey `activityid`
-    - name
-    - description
-    - activitytype (run, ride, other)
-    - starttime
-    - time
-    - distance
-    - ascent
-    - descent
-
-### Comments
-- PartitionKey `activityid`
-- RowKey `commentid`
-    - `userid`
-    - timestamp
-    - comment
-
-### Photos
-- PartitionKey `activityid`
-- RowKey `photoid`
-    - Path
-
-## Blob Storage Approach
-
-### Activities
-Files stored in path of `activityid`
-- `source.gpx` - Source file of the activity
-- `geojson.json` - GeoJSON file for mapping (geojson)
-- `activitydata.json` - Custom activity model (json)
-
-### Photos
-Path is `activityid`\photos\\`photoid`
+[Google Doc Link](https://docs.google.com/spreadsheets/d/1w3IJKmRbWVmeEW3whp3uNintAZ6bExaaPi4kNrGqgR8/edit?usp=sharing)
 
 ## Work Items
 - Unclassified
-    - Get outsidely@gmail.com email
+    - ~~Get gmail.com email~~
+        - outsidelyproject@gmail.com others were taken. 
     - Rate limiting for all API calls combined to prevent abuse
     - Deletions table that logs primarykey=userid,rowkey=idtype (userid, activityid, mediaid, commentid, propid)
     - Quirk: whenever the record is touched, the Timestamp changes. So if someone keeps updating their activity it will always jump to the top. Even if it's mega old. Probably want to implement some sort of check about if it's a lot older than the original posting time then filter it out?
 - High
-    - ~~Agree and implement auth scheme - needed for gear, comments, photos, and all user-based preferences~~
+    - ~~Agree and implement auth scheme -  needed for gear, comments, photos, and all user-based preferences~~
 - Medium
-    - CRUD outline: https://docs.google.com/spreadsheets/d/1w3IJKmRbWVmeEW3whp3uNintAZ6bExaaPi4kNrGqgR8/edit?usp=sharing 
+    - CRUD stuff
         - ~~Gear~~, Comments, Photos, Props
     - Activities response returns laundered information
         - activitytype to label

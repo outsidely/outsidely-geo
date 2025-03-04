@@ -361,7 +361,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
 
         # save statistics to tblsvc
         upsertEntity("activities", activityproperties)
-
+        
         return createJsonHttpResponse(201, "successfully uploaded activity", {"activityid": activityid})
 
     except Exception as ex:
