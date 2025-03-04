@@ -47,7 +47,7 @@ Response
 
 ### GET /validate/{validationtype}
 - Built as a generic way to have constrained system values.
-- Current validations: validationtype, activitytype, datatype, unitsystem, retired, primarytype
+- Current validations available at `/validate/validationtype`
 
 ### Other CRUD
 
@@ -73,26 +73,27 @@ Response
 ### GET /read/gear
 Response
 ```json
-{"gear":[
-    {
-        "timestamp": "2025-03-01T15:50:20.346135+00:00",
-        "activitytype": "ride",
-        "distance": 0,
-        "name": "GT Sensor",
-        "userid": "jamund",
-        "gearid": "088072ad-63b8-4a9b-846a-64ae793cf9e5",
-        "retired": 1
-    },
-    {
-        "timestamp": "2025-03-01T15:23:46.261960+00:00",
-        "activitytype": "ride",
-        "distance": 0,
-        "name": "Transition Sentinel",
-        "userid": "jamund",
-        "gearid": "7d739518-23da-411b-8e35-3b4173ab94bc",
-        "retired": 0
-    }
-]}
+{
+    "gear":[
+        {
+            "timestamp": "2025-03-01T15:50:20.346135+00:00",
+            "activitytype": "ride",
+            "distance": 0,
+            "name": "GT Sensor",
+            "userid": "jamund",
+            "gearid": "088072ad-63b8-4a9b-846a-64ae793cf9e5",
+            "retired": 1
+        },
+        {
+            "timestamp": "2025-03-01T15:23:46.261960+00:00",
+            "activitytype": "ride",
+            "distance": 0,
+            "name": "Transition Sentinel",
+            "userid": "jamund",
+            "gearid": "7d739518-23da-411b-8e35-3b4173ab94bc",
+            "retired": 0
+        }]
+}
 ```
 
 ### PATCH /update/user/{userid}
