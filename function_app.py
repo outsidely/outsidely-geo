@@ -460,14 +460,14 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             if len(userdata) > 0:
                 a["firstname"] = userdata[a["userid"]]["firstname"]
                 a["lastname"] = userdata[a["userid"]]["lastname"]
-            media = []
+            mediadata = []
             if a.get("media", 0) > 0:
                 qm = queryEntities("media", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey", "Timestamp", "primarytype","sort"], {"RowKey": "mediaid"}, "sort")
                 for qme in qm:
                     qme["mediapreviewurl"] = "data/mediapreview/" + a["activityid"] + "/" + qme["mediaid"]
                     qme["mediafullurl"] = "data/mediafull/" + a["activityid"] + "/" + qme["mediaid"]
-                media = qm
-            a["media"] = media
+                mediadata = qm
+            a["media"] = mediadata
         
         response = {"activities": activities}
         if feedresponse:

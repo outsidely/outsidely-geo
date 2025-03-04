@@ -51,7 +51,7 @@ Response
 
 ### Other CRUD
 
-These all share similar code and routines with customization for some cases (changing password, for example). These will provide access for users, activities, gear, comments, photos, and props.
+These all share similar code and routines with customization for some cases (changing password, for example). These will provide access for users, activities, gear, comments, media, and props.
 
 ### POST /create/gear
 Request
@@ -212,10 +212,10 @@ Objects should be in the array ordered by timestamp.
     - Deletions table that logs primarykey=userid,rowkey=idtype (userid, activityid, mediaid, commentid, propid)
     - Quirk: whenever the record is touched, the Timestamp changes. So if someone keeps updating their activity it will always jump to the top. Even if it's mega old. Probably want to implement some sort of check about if it's a lot older than the original posting time then filter it out?
 - High
-    - ~~Agree and implement auth scheme -  needed for gear, comments, photos, and all user-based preferences~~
+    - ~~Agree and implement auth scheme -  needed for gear, comments, media, and all user-based preferences~~
 - Medium
     - CRUD stuff
-        - ~~Gear~~, Comments, Photos, Props
+        - ~~Gear~~, comments, ~~media~~, props
     - Activities response returns laundered information
         - activitytype to label
         - converted values based on metric/imperial selection for a current user
