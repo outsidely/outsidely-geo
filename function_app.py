@@ -318,7 +318,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         m.add_line(Line(routejsonsimplified["features"][0]["geometry"]["coordinates"], 'red', 3))
         preview = BytesIO()
         image = m.render()
-        image.save(preview, optimize=True, quality=99, format="JPEG")
+        image.save(preview, optimize=True, quality=100, format="JPEG")
 
         # save file, geojson, activityData, preview to storage container
         saveBlob(upload, activityid + "/source.gpx", "application/gpx+xml")
