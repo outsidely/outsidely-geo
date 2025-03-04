@@ -250,6 +250,7 @@ Path is `activityid`\photos\\`photoid`
     - Get outsidely@gmail.com email
     - Rate limiting for all API calls combined to prevent abuse
     - Deletions table that logs primarykey=userid,rowkey=idtype (userid, activityid, mediaid, commentid, propid)
+    - Quirk: whenever the record is touched, the Timestamp changes. So if someone keeps updating their activity it will always jump to the top. Even if it's mega old. Probably want to implement some sort of check about if it's a lot older than the original posting time then filter it out?
 - High
     - ~~Agree and implement auth scheme - needed for gear, comments, photos, and all user-based preferences~~
 - Medium
