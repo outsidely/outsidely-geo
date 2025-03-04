@@ -278,3 +278,4 @@ Path is `activityid`\photos\\`photoid`
     - Users get recovery codes since no email / other way to recover
     - Manual activity entries
     - Users can generate a code and invite new users (one code per new user)
+    - Support video posting for media
