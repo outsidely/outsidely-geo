@@ -177,18 +177,30 @@ def queryEntities(table, filter, properties = None, aliases = {}, sortproperty =
             raise Exception("Error in sorting, likely due to missing property in response or entity")
     return response
 
-def incrementDecrement(table, partitionkey, rowkey, property, value):
+def incrementDecrement(table, partitionkey, rowkey, property, value, integer):
     entity = queryEntities(table, "PartitionKey eq '" + partitionkey + "' and RowKey eq '" + rowkey + "'", [property])
     if len(entity) == 0:
         raise Exception("entity not found")
-    try:
-        currvalue = float(entity[0][property])
-    except:
-        currvalue = float(0)
+    if not integer:
+        try:
+            currvalue = float(entity[0][property])
+        except:
+            currvalue = float(0)
+    else:
+        try:
+            currvalue = int(entity[0][property])
+        except:
+            currvalue = int(0)
+    newvalue = currvalue + value
+    if newvalue < 0:
+        if not integer:
+            newvalue = float(0)
+        else:
+            newvalue = int(0)
     upsertEntity(table, {
         "PartitionKey": partitionkey,
         "RowKey": rowkey,
-        property: currvalue + value
+        property: newvalue
     })
 
 def tsUnixToIso(ts):
@@ -339,10 +351,13 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties["ascent"] = statisticsdata["ascent"]
         activityproperties["descent"] = statisticsdata["descent"]
         activityproperties["starttime"] = statisticsdata["starttime"]
+        activityproperties["props"] = 0
+        activityproperties["media"] = 0
+        activityproperties["comments"] = 0
 
         # capture distance for gear
         if len(gearid) > 0:
-            incrementDecrement("gear", auth["userid"], gearid, "distance", activityproperties["distance"])
+            incrementDecrement("gear", auth["userid"], gearid, "distance", activityproperties["distance"], False)
 
         # save statistics to tblsvc
         upsertEntity("activities", activityproperties)
@@ -380,6 +395,7 @@ def uploadmedia(req: func.HttpRequest) -> func.HttpResponse:
                 for e in qe:
                     if e["sort"] > sort:
                         sort = e["sort"]
+            incrementDecrement("activities", auth["userid"], req.route_params.get("activityid"), "media", 1, True)
             upsertEntity("media",{
                 "PartitionKey": activityid,
                 "RowKey": mediaid,
@@ -440,12 +456,14 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             if len(userdata) > 0:
                 a["firstname"] = userdata[a["userid"]]["firstname"]
                 a["lastname"] = userdata[a["userid"]]["lastname"]
-            # add media if exists (in fugure use increment/decrement on activity to know when to query and optimize)
-            qm = queryEntities("media", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey", "Timestamp", "primarytype","sort"], {"RowKey": "mediaid"}, "sort")
-            for qme in qm:
-                qme["mediapreviewurl"] = "data/mediapreview/" + a["activityid"] + "/" + qme["mediaid"]
-                qme["mediafullurl"] = "data/mediafull/" + a["activityid"] + "/" + qme["mediaid"]
-            a["media"] = qm
+            media = []
+            if a.get("media", 0) > 0:
+                qm = queryEntities("media", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey", "Timestamp", "primarytype","sort"], {"RowKey": "mediaid"}, "sort")
+                for qme in qm:
+                    qme["mediapreviewurl"] = "data/mediapreview/" + a["activityid"] + "/" + qme["mediaid"]
+                    qme["mediafullurl"] = "data/mediafull/" + a["activityid"] + "/" + qme["mediaid"]
+                media = qm
+            a["media"] = media
         
         response = {"activities": activities}
         if feedresponse:
@@ -514,7 +532,7 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
 
-        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><body><a href="'+str(req.params.get("redirecturl") or "#")+'">Click here to go back</a></body></html>', status_code=200, mimetype="text/html")
+        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><body><h1><a href="'+str(req.params.get("redirecturl") or "#")+'">Click here to go back</a></h1></body></html>', status_code=200, mimetype="text/html")
     
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
@@ -665,21 +683,29 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
         match req.route_params.get("type"):
             case "activity":
-                qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id")+  "'")
+                qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") +  "'")
                 if len(qe) != 1:
                     return createJsonHttpResponse(404, "resource not found")
                 # validate gearid
                 if "gearid" in qe[0].keys():
-                    incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"])
+                    incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"], False)
+                upsertEntity("deletions", {
+                    "PartitionKey": auth["userid"],
+                    "RowKey": "activityid",
+                    "id": req.route_params.get("id")
+                })
                 deleteEntity("activities", auth["userid"], req.route_params.get("id"))
             case "media":
-                qe = queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'")
-                if len(qe) != 1:
+                if len(queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'")) != 1:
                     return createJsonHttpResponse(404, "resource not found")
+                incrementDecrement("activities", auth["userid"], req.route_params.get("id"), "media", -1, True)
+                upsertEntity("deletions", {
+                    "PartitionKey": auth["userid"],
+                    "RowKey": "mediaid",
+                    "id": req.route_params.get("id"),
+                    "id2": req.route_params.get("id2")
+                })
                 deleteEntity("media", req.route_params.get("id"), req.route_params.get("id2"))
-                deleteBlob(req.route_params.get("id") + "/media/" + req.route_params.get("id2") + "_original")
-                deleteBlob(req.route_params.get("id") + "/media/" + req.route_params.get("id2") + "_preview")
-                deleteBlob(req.route_params.get("id") + "/media/" + req.route_params.get("id2") + "_full")
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(200, "delete successful")
