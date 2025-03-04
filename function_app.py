@@ -444,7 +444,11 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             if "userid" in req.route_params.keys():
                 filter += " and PartitionKey eq '" + req.route_params.get("userid") + "'"
 
-        activities = queryEntities("activities", filter, aliases={"PartitionKey": "userid", "RowKey": "activityid"}, sortproperty="timestamp", sortreverse=True)
+        activities = queryEntities("activities", 
+            filter,
+            aliases={"PartitionKey": "userid", "RowKey": "activityid"},
+            sortproperty="timestamp", 
+            sortreverse=True)
 
         userdata = {}
         
