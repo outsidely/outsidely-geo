@@ -34,6 +34,7 @@ Response
 - `/activities` will start at the current time and provide a feed of all activities as well as a continuation url to follow for more
 - `/activities/{userid}` will create a feed limited to the provided userid
 - `/activities/{userid}/{activityid}` will filter to just one activity
+    - Also includes gear info and trackurl
 
 ### GET /data/{datatype}/{id}/{id2?}
 - Gets binary data objects stored in blob storage
@@ -78,7 +79,7 @@ Response
         {
             "timestamp": "2025-03-01T15:50:20.346135+00:00",
             "activitytype": "ride",
-            "distance": 0,
+            "distance": "laundered",
             "name": "GT Sensor",
             "userid": "jamund",
             "gearid": "088072ad-63b8-4a9b-846a-64ae793cf9e5",
@@ -87,12 +88,13 @@ Response
         {
             "timestamp": "2025-03-01T15:23:46.261960+00:00",
             "activitytype": "ride",
-            "distance": 0,
+            "distance": "laundered",
             "name": "Transition Sentinel",
             "userid": "jamund",
             "gearid": "7d739518-23da-411b-8e35-3b4173ab94bc",
             "retired": 0
-        }]
+        }
+    ]
 }
 ```
 
@@ -129,11 +131,9 @@ Request
 
 ### PATCH /update/media/{activityid}/{mediaid}
 Request
-- primarytype can only be "1" if provided - all other media will be set to primarytype="0"
 - sort is an integer in the range of current sort values for the given activityid, issuing a new sort will _swap_ the sort values
 ```json
 {
-    "primarytype": "1",
     "sort": 3
 }
 ```
@@ -206,28 +206,25 @@ Objects should be in the array ordered by timestamp.
 
 ## Work Items
 - Unclassified
-    - ~~Get gmail.com email~~
-        - outsidelyproject@gmail.com others were taken. 
+    - ~~Get gmail.com email -  outsidelyproject@gmail.com others were taken. ~~
     - Rate limiting for all API calls combined to prevent abuse
-    - Deletions table that logs primarykey=userid,rowkey=idtype (userid, activityid, mediaid, commentid, propid)
+    - ~~Deletions table that logs primarykey=userid,rowkey=idtype (userid, activityid, mediaid, commentid, propid)~~
     - Quirk: whenever the record is touched, the Timestamp changes. So if someone keeps updating their activity it will always jump to the top. Even if it's mega old. Probably want to implement some sort of check about if it's a lot older than the original posting time then filter it out?
 - High
     - ~~Agree and implement auth scheme -  needed for gear, comments, media, and all user-based preferences~~
 - Medium
     - CRUD stuff
-        - ~~Gear~~, comments, ~~media~~, props
-    - Activities response returns laundered information
-        - activitytype to label
-        - converted values based on metric/imperial selection for a current user
-        - speed/pace depending on activitytype
+        - ~~Gear~~, comments, ~~media~~, props, connections
+    - ~~Activities response returns laundered information~~
     - Map for the activity page w/ elevation profile and linked event support
 - Low
     - Look at activities as a sort of hierarchy?
         - gps: 1, 0
         - assisted: 0, 1
-        - activitytype: feet, wheels, workout
+        - activitytype: run, ride, other
             - stats happen at this level unless a subtype is requested
-        - activitysubtype: run, walk, mountain bike, gravel
+        - activitysubtype: run, walk, mountain bike, gravel - purely for display
+    - Activity starttime should probably be localized to where the person performed the activity? or is it just their usual timezone? How does this effect ordering?
     - Weekly, Monthly, Yearly stats
 - Long term
     - Moving time

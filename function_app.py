@@ -13,6 +13,7 @@
 import logging
 import os
 import datetime
+import pytz
 import time
 import geopandas
 import pyogrio
@@ -22,6 +23,7 @@ import base64
 import hashlib
 import secrets
 import string
+import math
 import azure.functions as func
 from io import BytesIO
 from dateutil import parser
@@ -204,14 +206,14 @@ def incrementDecrement(table, partitionkey, rowkey, property, value, integer):
     })
 
 def tsUnixToIso(ts):
-    return datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')
+    return datetime.datetime.utcfromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 def validateData(validationtype, value):
-    eq = queryEntities("validate","PartitionKey eq '" + validationtype + "' and RowKey eq '" + value + "'")
-    if len(eq) == 0:
-        return False
+    qe = queryEntities("validate","PartitionKey eq '" + validationtype + "' and RowKey eq '" + value + "'")
+    if len(qe) == 0:
+        return {"status": False, "label": "NoLabel"}
     else:
-        return True
+        return {"status": True, "label": qe[0]["label"]}
 
 def authorizer(req):
     try:
@@ -219,15 +221,17 @@ def authorizer(req):
         parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
         userid = parts[0]
         password = parts[1]
-        qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'", ["salt", "password"])
+        qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'", ["salt", "password", "unitsystem"])
         if len(qe) > 0:
             salt = qe[0]["salt"]
             if hashlib.sha512(str(salt + password).encode()).hexdigest() == qe[0]["password"]:
                 authorized = True
+            unitsystem = qe[0].get("unitsystem", "metric")
     except:
         authorized = False
         userid = ""
-    return {"authorized": authorized, "userid": userid}
+        unitsystem = "metric"
+    return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": "US/Eastern"}
 
 def checkJsonProperties(json, properties):
     matched = []
@@ -260,12 +264,53 @@ def checkJsonProperties(json, properties):
         message = "no properties matched."
     for p in properties:
         if p.get("validate", False) and p["name"] in matched:
-            if not validateData(p["name"], json[p["name"]]):
+            if not validateData(p["name"], json[p["name"]])["status"]:
                 status = False
                 if len(message) > 0:
                     message += " "
                 message += "invalid " + p["name"] + ": " + json[p["name"]] + "."
     return {"missing": missing, "invalid": invalid, "status": status, "message": message}
+
+def launderUnits(unitsystem, unittype, in_distance = None, in_time = None):
+    # time (hh:mm:ss)
+    # distance (km) (mi)
+    # ascent / descent (m) (ft)
+    # speed (km/hr) (mi/hr)
+    # pace min/km (min/mi)
+    if unittype == "time":
+        if in_time > 3600:
+            return time.strftime('%Hh %Mm %Ss', time.gmtime(in_time))
+        else:
+            return time.strftime('%Mm %Ss', time.gmtime(in_time))
+    if unitsystem == "metric":
+        match unittype:
+            case "distance":
+                return f"{in_distance/1000:,.2f}" + " km"
+            case "ascent":
+                return f"{in_distance:,.0f}" + " m"
+            case "speed":
+                return f"{(in_distance/1000)/(in_time/3600):,.1f}" + " km/hr"
+            case "pace":
+                pvalue = (in_time/60)/(in_distance/1000)
+                return str(math.floor(pvalue)) + ":" + (f"{(pvalue - math.floor(pvalue))*60:.0f}").zfill(2) + " min/km"
+    elif unitsystem == "imperial":
+        match unittype:
+            case "distance":
+                return f"{in_distance/1609.34:,.2f}" + " mi"
+            case "ascent":
+                return f"{in_distance*3.28084:,.0f}" + " ft"
+            case "speed":
+                return f"{(in_distance/1609.34)/(in_time/3600):,.1f}" + " mi/hr"
+            case "pace":
+                pvalue = (in_time/60)/(in_distance/1609.34)
+                return str(math.floor(pvalue)) + ":" + (f"{(pvalue - math.floor(pvalue))*60:.0f}").zfill(2) + " min/mi"
+    return ""
+
+def launderTimezone(timestamp, timezone):
+    utctime = datetime.datetime.fromisoformat(timestamp)
+    tztime = utctime.astimezone(pytz.timezone(timezone))
+    formattime = tztime.strftime("%B %d at %I:%M %p")
+    return formattime
 
 def resizeImage(img, size, quality):
     newimg = Image.open(img)
@@ -295,7 +340,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         
         activityproperties = {}
         activityproperties["activitytype"] = req.form.get("activitytype")
-        if not validateData("activitytype", activityproperties["activitytype"]):
+        if not validateData("activitytype", activityproperties["activitytype"])["status"]:
             createJsonHttpResponse(400, "invalid or missing activitytype")
 
         # validate gearid
@@ -388,10 +433,8 @@ def uploadmedia(req: func.HttpRequest) -> func.HttpResponse:
             saveBlob(preview, req.route_params.get("activityid") + "/media/" + mediaid + "_preview", "image/jpeg")
             saveBlob(full, req.route_params.get("activityid") + "/media/" + mediaid + "_full", "image/jpeg")
             qe = queryEntities("media", "PartitionKey eq '" + activityid + "'")
-            primarytype = "1"
             sort = 0
             if len(qe) > 0:
-                primarytype = "0"
                 for e in qe:
                     if e["sort"] > sort:
                         sort = e["sort"]
@@ -400,7 +443,6 @@ def uploadmedia(req: func.HttpRequest) -> func.HttpResponse:
                 "PartitionKey": activityid,
                 "RowKey": mediaid,
                 "filename": req.files["upload"].filename,
-                "primarytype": str(primarytype),
                 "sort": sort + 1
             })
             return createJsonHttpResponse(201, "successfully uploaded media", {"mediaid": mediaid})
@@ -451,8 +493,14 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             sortreverse=True)
 
         userdata = {}
+        activitytypes = {}
+
+        for e in queryEntities("validate", "PartitionKey eq 'activitytype'"):
+            activitytypes[e.get("RowKey")] = e.get("label")
         
         for a in activities:
+
+            # normalize
             a["previewurl"] = "data/preview/" + a["activityid"]
             if a["userid"] not in userdata.keys():
                 qu = queryEntities("users","PartitionKey eq '" + a["userid"] + "' and RowKey eq 'account'")
@@ -460,22 +508,52 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             if len(userdata) > 0:
                 a["firstname"] = userdata[a["userid"]]["firstname"]
                 a["lastname"] = userdata[a["userid"]]["lastname"]
+            
+            # media
             mediadata = []
             if a.get("media", 0) > 0:
-                qm = queryEntities("media", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey", "Timestamp", "primarytype","sort"], {"RowKey": "mediaid"}, "sort")
+                qm = queryEntities("media", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey", "Timestamp", "sort"], {"RowKey": "mediaid"}, "sort")
                 for qme in qm:
                     qme["mediapreviewurl"] = "data/mediapreview/" + a["activityid"] + "/" + qme["mediaid"]
                     qme["mediafullurl"] = "data/mediafull/" + a["activityid"] + "/" + qme["mediaid"]
                 mediadata = qm
             a["media"] = mediadata
+            
+            # launder
+            activitytype = a["activitytype"]
+            a_distance = a["distance"]
+            a_time = a["time"]
+            a_ascent = a["ascent"]
+            a_descent = a["descent"]
+            a["activitytype"] = activitytypes[a["activitytype"]]
+            a["time"] = launderUnits(auth["unitsystem"], "time", in_time=a_time)
+            a["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=a_distance)
+            a["ascent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=a_ascent)
+            a["descent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=a_descent)
+            if activitytype == "run":
+                a["speed"] = launderUnits(auth["unitsystem"], "pace", in_distance=a_distance, in_time=a_time)
+            else:
+                a["speed"] = launderUnits(auth["unitsystem"], "speed", in_distance=a_distance, in_time=a_time)
+            a["timestamp"] = launderTimezone(a["timestamp"], auth["timezone"])
+            a["starttime"] = launderTimezone(a["starttime"], auth["timezone"])
+            
+            # add gear, include track path
+            if not feedresponse:
+                if a.get("gearid", None) != None:
+                    a["gear"] = queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + a["gearid"] + "'", ["RowKey","distance","name"], {"RowKey": "gearid"})[0]
+                    a["gear"]["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=a["gear"]["distance"])
+                    a.pop("gearid")
+                a["trackurl"] = "data/geojson/" + a["activityid"]
         
         response = {"activities": activities}
         if feedresponse:
             nexturl = "activities"
             if "userid" in req.route_params.keys():
                 nexturl += "/" + req.route_params.get("userid")
-            nexturl += "?endtime=" +str(starttime) + "&starttime=" + str(starttime - delta)
+            nexturl += "?endtime=" + str(starttime) + "&starttime=" + str(starttime - delta)
             response["nexturl"] = nexturl
+            response["endtime"] = endtime
+            response["starttime"] = starttime
 
         return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
 
@@ -490,7 +568,7 @@ def data(req: func.HttpRequest) -> func.HttpResponse:
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
         datatype = req.route_params.get("datatype")
-        if not validateData("datatype", datatype):
+        if not validateData("datatype", datatype)["status"]:
             return createJsonHttpResponse(400, "invalid datatype")
         match datatype:
             case "preview":
@@ -518,7 +596,7 @@ def validate(req: func.HttpRequest) -> func.HttpResponse:
         auth = authorizer(req)
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-        if not validateData("validationtype", req.route_params.get("validationtype")):
+        if not validateData("validationtype", req.route_params.get("validationtype"))["status"]:
             return createJsonHttpResponse(400, "invalid validationtype")
         data = queryEntities("validate", "PartitionKey eq '" + req.route_params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": req.route_params["validationtype"]}, "sort")
         return func.HttpResponse(json.dumps(data), status_code=200, mimetype="application/json")
@@ -586,7 +664,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="read/{type}", methods=[func.HttpMethod.GET])
+@app.route(route="read/{type}/{id?}", methods=[func.HttpMethod.GET])
 def read(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called read')
     try:
@@ -595,7 +673,14 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
         match req.route_params.get("type"):
             case "gear":
-                return func.HttpResponse(json.dumps({"gear":queryEntities("gear","PartitionKey eq '" + auth["userid"] + "'", aliases={"PartitionKey":"userid","RowKey":"gearid"}, sortproperty="timestamp", sortreverse=True)}), status_code=200, mimetype="application/json")
+                gearfilter = ""
+                if req.route_params.get("id", None) != None:
+                    gearfilter += " and RowKey eq '" + req.route_params.get("id") + "'"
+                qe = queryEntities("gear","PartitionKey eq '" + auth["userid"] + "'" + gearfilter, aliases={"PartitionKey":"userid","RowKey":"gearid"}, sortproperty="timestamp", sortreverse=True)
+                for e in qe:
+                    e["activitytype"] = validateData("activitytype", e["activitytype"]).get("label")
+                    e["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=e["distance"])
+                return func.HttpResponse(json.dumps({"gear":qe}), status_code=200, mimetype="application/json")
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
     except Exception as ex:
@@ -649,19 +734,12 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 qe = queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'")
                 if len(qe) == 0:
                     return createJsonHttpResponse(404, "resource not found")
-                cjp = checkJsonProperties(body, [{"name":"primarytype","validate":True},{"name":"sort"}])
+                cjp = checkJsonProperties(body, [{"name":"sort"}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 oldsort = qe[0].get("sort")
                 qe = queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey ne '" + req.route_params.get("id2") + "'", aliases={"PartitionKey":"activityid","RowKey":"mediaid"})
                 for e in qe:
-                    if "primarytype" in body.keys():
-                        if e["primarytype"] == "1":
-                            upsertEntity("media", {
-                                "PartitionKey": e["activityid"],
-                                "RowKey": e["mediaid"],
-                                "primarytype": "0"
-                            })
                     if "sort" in body.keys():
                         if e["sort"] == body["sort"]:
                             upsertEntity("media", {
