@@ -1,15 +1,3 @@
-#https://learn.microsoft.com/en-us/python/api/azure-functions/azure.functions?view=azure-python
-#  reference
-
-#https://stackoverflow.com/questions/47068504/where-to-find-python-implementation-of-chaikins-corner-cutting-algorithm
-#  useful for smoothing distance
-
-#https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.CubicSpline.html#scipy.interpolate.CubicSpline
-#  useful for smoothing elevation
-
-#https://fitdecode.readthedocs.io/en/latest/
-#  useful for reading fit files
-
 import logging
 import os
 import datetime

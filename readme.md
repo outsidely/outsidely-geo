@@ -236,3 +236,7 @@ Objects should be in the array ordered by timestamp.
     - Manual activity entries
     - Users can generate a code and invite new users (one code per new user)
     - Support video posting for media
+- Reference
+    - useful for smoothing distance https://stackoverflow.com/questions/47068504/where-to-find-python-implementation-of-chaikins-corner-cutting-algorithm
+    - useful for smoothing elevation https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.CubicSpline.html#scipy.interpolate.CubicSpline
+    - useful for reading fit files https://fitdecode.readthedocs.io/en/latest/
