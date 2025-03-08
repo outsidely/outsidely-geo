@@ -623,14 +623,17 @@ def echo(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="create/{type}", methods=[func.HttpMethod.POST])
+@app.route(route="create/{type}/{id?}", methods=[func.HttpMethod.POST])
 def create(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called create')
     try:
         auth = authorizer(req)
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-        body = req.get_json()
+        try:
+            body = req.get_json()
+        except:
+            body = {}
         id = {}
         match req.route_params.get("type"):
             case "gear":
@@ -646,6 +649,30 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["retired"] = str("0")
                 upsertEntity("gear", body)
                 id["gearid"] = gearid
+            case "connection":
+                upsertEntity("connections", {
+                    "PartitionKey": auth["userid"],
+                    "RowKey": req.route_params.get("id"),
+                    "connectiontype": "confirmed"
+                })
+                # if it doesn't exist yet, set to pending
+                upsertEntity("connections", {
+                    "PartitionKey": req.route_params.get("id"),
+                    "RowKey": auth["userid"],
+                    "connectiontype": "pending"
+                })
+                # then do we need this at all?
+                if len(queryEntities("connections", "(PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "') or (PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + auth["userid"] + "')")) == 2:
+                    upsertEntity("connections", {
+                        "PartitionKey": auth["userid"],
+                        "RowKey": req.route_params.get("id"),
+                        "connectiontype": "confirmed"
+                    })
+                    upsertEntity("connections", {
+                        "PartitionKey": req.route_params.get("id"),
+                        "RowKey": auth["userid"],
+                        "connectiontype": "confirmed"
+                    })
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(201, "create successful", id)
@@ -669,6 +696,9 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
                     e["activitytype"] = validateData("activitytype", e["activitytype"]).get("label")
                     e["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=e["distance"])
                 return func.HttpResponse(json.dumps({"gear":qe}), status_code=200, mimetype="application/json")
+            case "connections":
+                qe = queryEntities("connections", "PartitionKey eq '" + auth["userid"] + "'", ["RowKey", "connectiontype"], {"RowKey": "userid"})
+                return func.HttpResponse(json.dumps({"connections":qe}), status_code=200, mimetype="application/json")
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
     except Exception as ex:
