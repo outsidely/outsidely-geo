@@ -307,6 +307,12 @@ def resizeImage(img, size, quality):
     newimg.save(outimg, optimize=True, quality=quality, format="JPEG")
     return outimg.getvalue()
 
+def useridExists(userid):
+    if len(queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'"))>0:
+        return True
+    else:
+        return False
+
 @app.route(route="upload/activity", methods=[func.HttpMethod.POST])
 def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
 
@@ -607,33 +613,14 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="echo", methods=[func.HttpMethod.POST])
-def echo(req: func.HttpRequest) -> func.HttpResponse:
-
-    logging.info('called echo')
-
-    try:
-        
-        auth = authorizer(req)
-        if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-
-        return func.HttpResponse(req.get_body())
-    
-    except Exception as ex:
-        return createJsonHttpResponse(500, str(ex))
-
-@app.route(route="create/{type}/{id?}", methods=[func.HttpMethod.POST])
+@app.route(route="create/{type}", methods=[func.HttpMethod.POST])
 def create(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called create')
     try:
         auth = authorizer(req)
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-        try:
-            body = req.get_json()
-        except:
-            body = {}
+        body = req.get_json()
         id = {}
         match req.route_params.get("type"):
             case "gear":
@@ -649,30 +636,54 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["retired"] = str("0")
                 upsertEntity("gear", body)
                 id["gearid"] = gearid
-            case "connection":
+            case "connections":
+                cjp = checkJsonProperties(body, [{"name":"connectiontype","required":True,"validate":True},{"name":"userid","required":True}])
+                if not cjp["status"]:
+                    return createJsonHttpResponse(400, cjp["message"])
+                if not useridExists(body["userid"]):
+                    return createJsonHttpResponse(404, "userid not found")
+                
+                # if this connection is already connected then do nothing
+                qe = queryEntities("connections", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + body["userid"] + "'")
+                if (len(qe)>0):
+                    if qe[0].get("connectiontype", "")  == "connected":
+                        return createJsonHttpResponse(400, "already connected")
+
+                # if this is a rejection, then remove the records
+                if body["connectiontype"] == "rejected":
+                    deleteEntity("connections", auth["userid"], body["userid"])
+                    deleteEntity("connections", body["userid"], auth["userid"])
+                    return createJsonHttpResponse(200, "connection rejected")
+                
+                # submitting user is confirmed by action
                 upsertEntity("connections", {
                     "PartitionKey": auth["userid"],
-                    "RowKey": req.route_params.get("id"),
+                    "RowKey": body["userid"],
                     "connectiontype": "confirmed"
                 })
-                # if it doesn't exist yet, set to pending
-                upsertEntity("connections", {
-                    "PartitionKey": req.route_params.get("id"),
-                    "RowKey": auth["userid"],
-                    "connectiontype": "pending"
-                })
-                # then do we need this at all?
-                if len(queryEntities("connections", "(PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "') or (PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + auth["userid"] + "')")) == 2:
+                # if this is the creation of the connection pair, add the other user as pending
+                qe = queryEntities("connections", "PartitionKey eq '" + body["userid"] + "' and RowKey eq '" + auth["userid"] + "'")
+                if len(qe) == 0:
+                    upsertEntity("connections", {
+                        "PartitionKey": body["userid"],
+                        "RowKey": auth["userid"],
+                        "connectiontype": "pending"
+                    })
+
+                # if both users are confirmed, set to connected
+                if len(queryEntities("connections", "(PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + body["userid"] + "' and connectiontype eq 'confirmed') or (PartitionKey eq '" + body["userid"] + "' and RowKey eq '" + auth["userid"] + "' and connectiontype eq 'confirmed')")) == 2:
                     upsertEntity("connections", {
                         "PartitionKey": auth["userid"],
-                        "RowKey": req.route_params.get("id"),
-                        "connectiontype": "confirmed"
+                        "RowKey": body["userid"],
+                        "connectiontype": "connected"
                     })
                     upsertEntity("connections", {
-                        "PartitionKey": req.route_params.get("id"),
+                        "PartitionKey": body["userid"],
                         "RowKey": auth["userid"],
-                        "connectiontype": "confirmed"
+                        "connectiontype": "connected"
                     })
+                    incrementDecrement("users", auth["userid"], 'account', "connections", 1, True)
+
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(201, "create successful", id)
@@ -806,6 +817,17 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     "id2": req.route_params.get("id2")
                 })
                 deleteEntity("media", req.route_params.get("id"), req.route_params.get("id2"))
+            case "connections":
+                if len(queryEntities("connections", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) != 1:
+                    return createJsonHttpResponse(404, "resource not found")
+                incrementDecrement("users", auth["userid"], "account", "connections", -1, True)
+                upsertEntity("deletions", {
+                    "PartitionKey": auth["userid"],
+                    "RowKey": "userid",
+                    "id": req.route_params.get("id")
+                })
+                deleteEntity("connections", auth["userid"], req.route_params.get("id"))
+                deleteEntity("connections", req.route_params.get("id"), auth["userid"])
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(200, "delete successful")
