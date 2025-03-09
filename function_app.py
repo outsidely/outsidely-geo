@@ -203,23 +203,31 @@ def validateData(validationtype, value):
     else:
         return {"status": True, "label": qe[0]["label"]}
 
-def authorizer(req):
+def authorizer(req, includeconnections = False):
+    connections = []
     try:
         authorized = False
         parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
         userid = parts[0]
         password = parts[1]
-        qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'", ["salt", "password", "unitsystem"])
+        qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'", ["salt", "password", "unitsystem", "timezone"])
         if len(qe) > 0:
             salt = qe[0]["salt"]
             if hashlib.sha512(str(salt + password).encode()).hexdigest() == qe[0]["password"]:
                 authorized = True
             unitsystem = qe[0].get("unitsystem", "metric")
+            timezone = qe[0].get("timezone", "US/Eastern")
+        # pull connections
+        if includeconnections:
+            qec = queryEntities("connections", "PartitionKey eq '' and connectiontype eq 'connected'", ["RowKey"], {"RowKey":"userid"})
+            for e in qec:
+                connections.append(e["userid"])
     except:
         authorized = False
         userid = ""
         unitsystem = "metric"
-    return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": "US/Eastern"}
+        connections = []
+    return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": timezone, "connections": connections}
 
 def checkJsonProperties(json, properties):
     matched = []
