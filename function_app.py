@@ -140,32 +140,63 @@ def deleteEntity(table, partitionkey, rowkey):
     tableclient = tableserviceclient.get_table_client(table)
     tableclient.delete_entity(partitionkey, rowkey)
 
-def queryEntities(table, filter, properties = None, aliases = {}, sortproperty = None, sortreverse=False):
+def queryEntities(table, filter, properties = None, aliases = {}, sortproperty = None, sortreverse=False, userid=None, connectionproperty=None):
     table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
     table_client = table_service_client.get_table_client(table)
-    entities = table_client.query_entities(filter, select=properties)
+
+    if (userid==None and connectionproperty != None) or (userid!=None and connectionproperty == None):
+        raise Exception("userid and connectionproperty are both required if one is provided")
+
+    # if connections are provided, then build successive calls with up to 10 checked in each
+    allentities = []
+    if connectionproperty != None:
+        connections = []
+        table_client_connections = table_service_client.get_table_client("connections")
+        for entity in table_client_connections.query_entities("PartitionKey eq '" + userid + "' and connectiontype eq 'connected'", select=["RowKey"]):
+            connections.append(entity["RowKey"])
+        for connectionbatch in splitList(connections, 10):
+            filteradd = ""
+            if len(filter) != 0:
+                filteradd = " and "
+            filteradd += "("
+            first = True
+            for cb in connectionbatch:
+                if not first:
+                    filteradd += " or "
+                first = False
+                filteradd += " " + connectionproperty + " eq '" + cb + "'"
+            filteradd += ")"
+            allentities.append(table_client.query_entities(filter + filteradd, select=properties))
+    else:
+        allentities.append(table_client.query_entities(filter, select=properties))
+
     if properties == None:
         properties = []
     response = []
-    for entity in entities:
-        currentity = {}
-        if (len(properties)>0 and "timestamp" in properties) or len(properties)==0:
-            currentity["timestamp"] = entity.metadata["timestamp"].isoformat()
-        for p in entity:
-            if (len(properties)>0 and p in properties) or len(properties)==0:
-                if "TablesEntityDatetime" in str(type(entity[p])):
-                    currentity[p] = entity[p].isoformat()
-                else:
-                    currentity[p] = entity[p]
-        for a in aliases:
-            currentity[aliases[a]] = currentity.pop(a)
-        response.append(currentity)
+    for entities in allentities:
+        for entity in entities:
+            currentity = {}
+            if (len(properties)>0 and "timestamp" in properties) or len(properties)==0:
+                currentity["timestamp"] = entity.metadata["timestamp"].isoformat()
+            for p in entity:
+                if (len(properties)>0 and p in properties) or len(properties)==0:
+                    if "TablesEntityDatetime" in str(type(entity[p])):
+                        currentity[p] = entity[p].isoformat()
+                    else:
+                        currentity[p] = entity[p]
+            for a in aliases:
+                currentity[aliases[a]] = currentity.pop(a)
+            response.append(currentity)
     if sortproperty != None:
         try:
             response.sort(key=lambda s: s[sortproperty], reverse=sortreverse)
         except:
             raise Exception("Error in sorting, likely due to missing property in response or entity")
     return response
+
+def splitList(list, size):
+    for i in range(0, len(list), size):
+        yield list[i:i + size]
 
 def incrementDecrement(table, partitionkey, rowkey, property, value, integer):
     entity = queryEntities(table, "PartitionKey eq '" + partitionkey + "' and RowKey eq '" + rowkey + "'", [property])
@@ -222,6 +253,7 @@ def authorizer(req, includeconnections = False):
             qec = queryEntities("connections", "PartitionKey eq '' and connectiontype eq 'connected'", ["RowKey"], {"RowKey":"userid"})
             for e in qec:
                 connections.append(e["userid"])
+        connections.append(userid)
     except:
         authorized = False
         userid = ""
@@ -864,5 +896,23 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(200, "delete successful")
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
+@app.route(route="testconnections/{userid}", methods=[func.HttpMethod.GET])
+def testconnections(req: func.HttpRequest) -> func.HttpResponse:
+
+    logging.info('called testconnections')
+
+    try:
+        
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+
+        qe = queryEntities("activities", "PartitionKey eq '" + req.route_params.get("userid","") + "'", userid=auth["userid"], connectionproperty="RowKey")
+
+        return func.HttpResponse(json.dumps(qe), status_code=200, mimetype="application/json")
+    
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
