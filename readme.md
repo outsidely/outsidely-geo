@@ -71,6 +71,16 @@ Response
 }
 ```
 
+### POST /create/connections
+To create a connection, one user must initiate. This is done using connectiontype of "confirmed". The other userid will then be listed as "pending" unless they also "confirm" or they choose to "reject".
+Request
+```json
+{
+    "connectiontype": "a valid value from /validate/connectiontype",
+    "userid": "userid of the person to attempt to connect to"
+}
+```
+
 ### GET /read/gear
 Response
 ```json
@@ -93,6 +103,32 @@ Response
             "userid": "jamund",
             "gearid": "7d739518-23da-411b-8e35-3b4173ab94bc",
             "retired": 0
+        }
+    ]
+}
+```
+
+### GET /read/connections
+Acceptable values and normalization for connectiontype are available in `/validate/connectiontype`
+
+Response
+```json
+{
+    "connections":[
+        {
+            // you and mamund are connected
+            "userid":"mamund",
+            "connectiontype":"connected"
+        },
+        {
+            // you have received a connection request from userid="damund" and have yet to respond with connectiontype of "confirmed" or "rejected"
+            "userid":"damund",
+            "connectiontype":"pending"
+        },
+        {
+            // this means that the calling user sent a request and it that lamund has a "pending" connectiontype
+            "userid":"lamund",
+            "connectiontype":"confirmed"
         }
     ]
 }
@@ -148,6 +184,15 @@ Response
 ```
 
 ### DELETE /delete/media/{activityid}/{mediaid}
+Response
+```json
+{
+    "statuscode": 200,
+    "message": "delete successful"
+}
+```
+
+### DELETE /delete/connection/{userid}
 Response
 ```json
 {
