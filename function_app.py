@@ -636,7 +636,7 @@ def validate(req: func.HttpRequest) -> func.HttpResponse:
         if not validateData("validationtype", req.route_params.get("validationtype"))["status"]:
             return createJsonHttpResponse(400, "invalid validationtype")
         data = queryEntities("validate", "PartitionKey eq '" + req.route_params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": req.route_params["validationtype"]}, "sort")
-        return func.HttpResponse(json.dumps(data), status_code=200, mimetype="application/json")
+        return func.HttpResponse(json.dumps({"validations":data}), status_code=200, mimetype="application/json")
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
