@@ -9,3 +9,7 @@ curl -X DELETE -H "@C:\Temp\auth_outsidely.txt" "http://localhost:7071/api/delet
 curl -H "@C:\Temp\auth_outsidely.txt" "http://localhost:7071/api/read/gear"
 
 curl -H "@C:\Temp\auth_outsidely.txt" "http://localhost:7071/api/validate/validationtype"
+
+fix issue with port lock:
+netstat -ano|findstr 7071
+taskkill /F /PID 44116

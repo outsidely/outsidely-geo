@@ -150,7 +150,7 @@ def queryEntities(table, filter, properties = None, aliases = {}, sortproperty =
     # if connections are provided, then build successive calls with up to 10 checked in each
     allentities = []
     if connectionproperty != None:
-        connections = []
+        connections = [userid]
         table_client_connections = table_service_client.get_table_client("connections")
         for entity in table_client_connections.query_entities("PartitionKey eq '" + userid + "' and connectiontype eq 'connected'", select=["RowKey"]):
             connections.append(entity["RowKey"])
@@ -234,8 +234,7 @@ def validateData(validationtype, value):
     else:
         return {"status": True, "label": qe[0]["label"]}
 
-def authorizer(req, includeconnections = False):
-    connections = []
+def authorizer(req):
     try:
         authorized = False
         parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
@@ -248,18 +247,12 @@ def authorizer(req, includeconnections = False):
                 authorized = True
             unitsystem = qe[0].get("unitsystem", "metric")
             timezone = qe[0].get("timezone", "US/Eastern")
-        # pull connections
-        if includeconnections:
-            qec = queryEntities("connections", "PartitionKey eq '' and connectiontype eq 'connected'", ["RowKey"], {"RowKey":"userid"})
-            for e in qec:
-                connections.append(e["userid"])
-        connections.append(userid)
     except:
         authorized = False
         userid = ""
         unitsystem = "metric"
-        connections = []
-    return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": timezone, "connections": connections}
+        timezone = "US/Eastern"
+    return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": timezone}
 
 def checkJsonProperties(json, properties):
     matched = []
@@ -349,6 +342,14 @@ def resizeImage(img, size, quality):
 
 def useridExists(userid):
     if len(queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'"))>0:
+        return True
+    else:
+        return False
+
+def useridIsConnection(userid, connectionuserid):
+    if userid == connectionuserid:
+        return True
+    if len(queryEntities("connections", "PartitionKey eq '" + userid + "' and RowKey eq '" + connectionuserid + "' and connectiontype eq 'connected"))>0:
         return True
     else:
         return False
@@ -524,7 +525,9 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             filter,
             aliases={"PartitionKey": "userid", "RowKey": "activityid"},
             sortproperty="starttime", 
-            sortreverse=True)
+            sortreverse=True,
+            userid=auth["userid"],
+            connectionproperty="PartitionKey")
 
         userdata = {}
         activitytypes = {}
@@ -896,23 +899,5 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(200, "delete successful")
-    except Exception as ex:
-        return createJsonHttpResponse(500, str(ex))
-
-@app.route(route="testconnections/{userid}", methods=[func.HttpMethod.GET])
-def testconnections(req: func.HttpRequest) -> func.HttpResponse:
-
-    logging.info('called testconnections')
-
-    try:
-        
-        auth = authorizer(req)
-        if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-
-        qe = queryEntities("activities", "PartitionKey eq '" + req.route_params.get("userid","") + "'", userid=auth["userid"], connectionproperty="RowKey")
-
-        return func.HttpResponse(json.dumps(qe), status_code=200, mimetype="application/json")
-    
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))

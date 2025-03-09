@@ -293,6 +293,7 @@ Objects should be in the array ordered by timestamp.
 - Long term
     - Moving time
     - Smoothing for elevation
+    - Smoothing for activity distance
     - Support using DEM-based elevation
     - Privacy zones
     - Duplicate activity detection
