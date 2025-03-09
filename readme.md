@@ -71,7 +71,7 @@ Response
 }
 ```
 
-### POST /create/connections
+### POST /create/connection
 To create a connection, one user must initiate. This is done using connectiontype of "confirmed". The other userid will then be listed as "pending" unless they also "confirm" or they choose to "reject".
 Request
 ```json
@@ -255,6 +255,7 @@ Objects should be in the array ordered by timestamp.
     - Rate limiting for all API calls combined to prevent abuse
     - ~~Deletions table that logs primarykey=userid,rowkey=idtype (userid, activityid, mediaid, commentid, propid)~~
     - Quirk: whenever the record is touched, the Timestamp changes. So if someone keeps updating their activity it will always jump to the top. Even if it's mega old. Probably want to implement some sort of check about if it's a lot older than the original posting time then filter it out?
+    - Issue: consider activityid=710e05fd-61c8-456c-be38-5eb90ad1a045 why is the starttime wrong? device issue? 
 - High
     - ~~Agree and implement auth scheme -  needed for gear, comments, media, and all user-based preferences~~
 - Medium

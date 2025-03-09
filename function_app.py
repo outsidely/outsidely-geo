@@ -483,7 +483,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         activities = queryEntities("activities", 
             filter,
             aliases={"PartitionKey": "userid", "RowKey": "activityid"},
-            sortproperty="timestamp", 
+            sortproperty="starttime", 
             sortreverse=True)
 
         userdata = {}
@@ -636,7 +636,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["retired"] = str("0")
                 upsertEntity("gear", body)
                 id["gearid"] = gearid
-            case "connections":
+            case "connection":
                 cjp = checkJsonProperties(body, [{"name":"connectiontype","required":True,"validate":True},{"name":"userid","required":True}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
@@ -698,6 +698,21 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
         match req.route_params.get("type"):
+            case "user":
+                userid = req.route_params.get("id", "")
+                if len(userid) == 0:
+                    userid = auth["userid"]
+                if not useridExists(userid):
+                    return createJsonHttpResponse(404, "userid not found")
+                properties = ["PartitionKey","firstname", "lastname", "connections", "createtime"]
+                if auth["userid"] == userid:
+                    for p in ["unitsystem","timezone","email"]:
+                        properties.append(p)
+                qe = queryEntities("users", 
+                                   "PartitionKey eq '" + userid + "' and RowKey eq 'account'", 
+                                   properties,
+                                   {"PartitionKey": "userid"})
+                return func.HttpResponse(json.dumps(qe[0]), status_code=200, mimetype="application/json")
             case "gear":
                 gearfilter = ""
                 if req.route_params.get("id", None) != None:
@@ -708,7 +723,16 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
                     e["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=e["distance"])
                 return func.HttpResponse(json.dumps({"gear":qe}), status_code=200, mimetype="application/json")
             case "connections":
-                qe = queryEntities("connections", "PartitionKey eq '" + auth["userid"] + "'", ["RowKey", "connectiontype"], {"RowKey": "userid"})
+                userid = req.route_params.get("id", "")
+                if len(userid) == 0:
+                    userid = auth["userid"]
+                if not useridExists(userid):
+                    return createJsonHttpResponse(404, "userid not found")
+                filter = ""
+                if auth["userid"] != userid:
+                    userid = req.route_params["id"]
+                    filter = " and connectiontype eq 'confirmed'"
+                qe = queryEntities("connections", "PartitionKey eq '" + userid + "'" + filter, ["RowKey", "connectiontype"], {"RowKey": "userid"})
                 return func.HttpResponse(json.dumps({"connections":qe}), status_code=200, mimetype="application/json")
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
@@ -817,10 +841,11 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     "id2": req.route_params.get("id2")
                 })
                 deleteEntity("media", req.route_params.get("id"), req.route_params.get("id2"))
-            case "connections":
+            case "connection":
                 if len(queryEntities("connections", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) != 1:
                     return createJsonHttpResponse(404, "resource not found")
                 incrementDecrement("users", auth["userid"], "account", "connections", -1, True)
+                incrementDecrement("users", req.route_params.get("id"), "account", "connections", -1, True)
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
                     "RowKey": "userid",
