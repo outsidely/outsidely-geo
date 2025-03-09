@@ -134,6 +134,24 @@ Response
 }
 ```
 
+### GET /read/user/{userid?}
+If no userid is provided, the information returned is for the calling user. Certain fields only return for a calling user.
+
+Response
+```json
+{
+    "connections": 0, 
+    "createtime": "2025-03-09T01:06:34.428317+00:00", 
+    "userid": "jamund",
+    "firstname": "Jesse", 
+    "lastname": "Amundsen",
+    // next three only return for calling user
+    "timezone": "America/New_York", 
+    "unitsystem": "imperial",
+    "email": "fake@email.com"
+}
+```
+
 ### PATCH /update/user/{userid}
 Request
 ```json
