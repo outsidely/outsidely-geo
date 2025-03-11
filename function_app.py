@@ -576,13 +576,17 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             a["timestamp"] = launderTimezone(a["timestamp"], auth["timezone"])
             a["starttime"] = launderTimezone(a["starttime"], auth["timezone"])
             
-            # add gear, include track path
+            # add gear, include track path for single activity response
             if not feedresponse:
                 if a.get("gearid", None) != None:
                     a["gear"] = queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + a["gearid"] + "'", ["RowKey","distance","name"], {"RowKey": "gearid"})[0]
                     a["gear"]["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=a["gear"]["distance"])
-                    a.pop("gearid")
                 a["trackurl"] = "data/geojson/" + a["activityid"]
+
+            excludeproperties = ["timestamp","gearid"]
+            for ep in excludeproperties:
+                if ep in a.keys():
+                    a.pop(ep, None)
         
         response = {"activities": activities}
         if feedresponse:
@@ -591,8 +595,6 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
                 nexturl += "/" + req.route_params.get("userid")
             nexturl += "?endtime=" + str(starttime) + "&starttime=" + str(starttime - delta)
             response["nexturl"] = nexturl
-            response["endtime"] = endtime
-            response["starttime"] = starttime
 
         return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
 
