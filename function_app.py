@@ -299,7 +299,7 @@ def launderUnits(unitsystem, unittype, in_distance = None, in_time = None):
     # speed (km/hr) (mi/hr)
     # pace min/km (min/mi)
     if unittype == "time":
-        if in_time > 3600:
+        if in_time >= 3600:
             return time.strftime('%Hh %Mm %Ss', time.gmtime(in_time))
         else:
             return time.strftime('%Mm %Ss', time.gmtime(in_time))
@@ -434,6 +434,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties["props"] = 0
         activityproperties["media"] = 0
         activityproperties["comments"] = 0
+        activityproperties["gps"] = 1
 
         # capture distance for gear
         if len(gearid) > 0:
@@ -558,10 +559,10 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             
             # launder
             activitytype = a["activitytype"]
-            a_distance = a["distance"]
-            a_time = a["time"]
-            a_ascent = a["ascent"]
-            a_descent = a["descent"]
+            a_distance = a.get("distance",0)
+            a_time = a.get("time",0)
+            a_ascent = a.get("ascent",0)
+            a_descent = a.get("descent",0)
             a["activitytype"] = activitytypes[a["activitytype"]]
             a["time"] = launderUnits(auth["unitsystem"], "time", in_time=a_time)
             a["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=a_distance)
@@ -666,6 +667,23 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
         body = req.get_json()
         id = {}
         match req.route_params.get("type"):
+            case "activity":
+                cjp = checkJsonProperties(body, [{"name":"activitytype","required":True, "validate": True},{"name":"ascent"},{"name":"distance"},{"name":"starttime","required":True},{"name":"time","required":True},{"name":"description"},{"name":"name"},{"name":"gearid"}])
+                if not cjp["status"]:
+                    return createJsonHttpResponse(400, cjp["message"])
+                if len(body.get("gearid",""))>0:
+                    if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and name eq '" + body["gearid"] + "'")) == 0:
+                        return createJsonHttpResponse(400, "gearid not found")
+                activityid = str(uuid.uuid4())
+                body["PartitionKey"] = auth["userid"]
+                body["RowKey"] = activityid
+                body["gps"] = 0
+                body["starttime"] = parser.isoparse(body["starttime"])
+                upsertEntity("activities", body)
+                id["activityid"] = activityid
+                # capture distance for gear
+                if len(body.get("gearid","")) > 0:
+                    incrementDecrement("gear", auth["userid"], body["gearid"], "distance", body.get("distance", 0), False)
             case "gear":
                 cjp = checkJsonProperties(body, [{"name":"activitytype","required":True,"validate":True},{"name":"name","required":True}])
                 if not cjp["status"]:
