@@ -539,7 +539,8 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         for a in activities:
 
             # normalize
-            a["previewurl"] = "data/preview/" + a["activityid"]
+            if a.get("gps","1") == 1:
+                a["previewurl"] = "data/preview/" + a["activityid"]
             if a["userid"] not in userdata.keys():
                 qu = queryEntities("users","PartitionKey eq '" + a["userid"] + "' and RowKey eq 'account'")
                 userdata[a["userid"]] = {"firstname": qu[0]["firstname"], "lastname": qu[0]["lastname"]}
