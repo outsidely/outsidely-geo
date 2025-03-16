@@ -983,7 +983,12 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 })
                 deleteEntity("props", req.route_params.get("id"), auth["userid"])
             case "comment":
-                if len(queryEntities("comments", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'")) == 0:
+                # allow deleting a comment if its the owner of the activity
+                cnt = 0
+                cnt += len(queryEntities("comments", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "' and userid eq '" + auth["userid"] + "'"))
+                if cnt == 0:
+                    cnt += len(queryEntities("activities", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'"))
+                if cnt == 0:
                     return createJsonHttpResponse(400, "cannot delete comment")
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
