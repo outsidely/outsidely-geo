@@ -300,7 +300,7 @@ def launderUnits(unitsystem, unittype, in_distance = None, in_time = None):
     # pace min/km (min/mi)
     if unittype == "time":
         if in_time >= 3600:
-            return time.strftime('%Hh %Mm %Ss', time.gmtime(in_time))
+            return time.strftime('%Hh %Mm', time.gmtime(in_time))
         else:
             return time.strftime('%Mm %Ss', time.gmtime(in_time))
     if unitsystem == "metric":
@@ -538,8 +538,15 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         
         for a in activities:
 
+            if a.get("gps",1) == 1:
+                gps = True
+            else:
+                gps = False
+
+            if gps:
+                a["previewurl"] = "data/preview/" + a["activityid"]
+
             # normalize
-            a["previewurl"] = "data/preview/" + a["activityid"]
             if a["userid"] not in userdata.keys():
                 qu = queryEntities("users","PartitionKey eq '" + a["userid"] + "' and RowKey eq 'account'")
                 userdata[a["userid"]] = {"firstname": qu[0]["firstname"], "lastname": qu[0]["lastname"]}
@@ -575,14 +582,25 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             a["timestamp"] = launderTimezone(a["timestamp"], auth["timezone"])
             a["starttime"] = launderTimezone(a["starttime"], auth["timezone"])
             
-            # add gear, include track path
+            # add gear, include track path for single activity response
             if not feedresponse:
                 if a.get("gearid", None) != None:
                     a["gear"] = queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + a["gearid"] + "'", ["RowKey","distance","name"], {"RowKey": "gearid"})[0]
                     a["gear"]["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=a["gear"]["distance"])
-                    a.pop("gearid")
                 a["trackurl"] = "data/geojson/" + a["activityid"]
-        
+
+            # exclude certain properties and customize response based on type
+            excludeproperties = ["timestamp","gearid"]
+            if a_distance == 0:
+                excludeproperties += ["distance","speed"]
+            if a_ascent == 0:
+                excludeproperties.append("ascent")
+            if a_descent == 0:
+                excludeproperties.append("descent")
+            for ep in excludeproperties:
+                if ep in a.keys():
+                    a.pop(ep, None)
+            
         response = {"activities": activities}
         if feedresponse:
             nexturl = "activities"
@@ -590,8 +608,6 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
                 nexturl += "/" + req.route_params.get("userid")
             nexturl += "?endtime=" + str(starttime) + "&starttime=" + str(starttime - delta)
             response["nexturl"] = nexturl
-            response["endtime"] = endtime
-            response["starttime"] = starttime
 
         return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
 
