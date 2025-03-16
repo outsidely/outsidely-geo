@@ -299,7 +299,7 @@ Objects should be in the array ordered by timestamp.
 ## Work Items
 - User invites and creation
 - User deletion
-- CRUD for comments and props
+- support "private" activities that are not seen by anyone except owner
 - Map for the activity page w/ elevation profile and linked event support
 - Finalize activitytype approach (needs discussion, thought)
     - gps: 1, 0
