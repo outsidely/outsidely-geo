@@ -553,16 +553,13 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             if len(userdata) > 0:
                 a["firstname"] = userdata[a["userid"]]["firstname"]
                 a["lastname"] = userdata[a["userid"]]["lastname"]
-            
+
             # media
-            mediadata = []
-            if a.get("media", 0) > 0:
-                qm = queryEntities("media", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey", "Timestamp", "sort"], {"RowKey": "mediaid"}, "sort")
-                for qme in qm:
-                    qme["mediapreviewurl"] = "data/mediapreview/" + a["activityid"] + "/" + qme["mediaid"]
-                    qme["mediafullurl"] = "data/mediafull/" + a["activityid"] + "/" + qme["mediaid"]
-                mediadata = qm
-            a["media"] = mediadata
+            qe = queryEntities("media", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey", "sort"], {"RowKey": "mediaid"}, "sort")
+            for e in qe:
+                e["mediapreviewurl"] = "data/mediapreview/" + a["activityid"] + "/" + e["mediaid"]
+                e["mediafullurl"] = "data/mediafull/" + a["activityid"] + "/" + e["mediaid"]
+            a["media"] = qe
 
             # props
             qe = queryEntities("props", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey","createtime"], {"RowKey": "userid"}, "createtime", True)
@@ -781,7 +778,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     return createJsonHttpResponse(400, "cannot prop self")
                 if len(queryEntities("activities", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'", userid=auth["userid"], connectionproperty="PartitionKey")) == 0:
                     return createJsonHttpResponse(404, "userid and or activity not found")
-                if len(queryEntities("props", "PartitionKey eq '" + req.route_params.get("id2", "") + "' and RowKey eq '" + auth["userid"] + "'")) > 0:
+                if len(queryEntities("props", "PartitionKey eq '" + req.route_params.get("id2") + "' and RowKey eq '" + auth["userid"] + "'")) > 0:
                     return createJsonHttpResponse(400, "prop already exists")
                 upsertEntity("props", {
                     "PartitionKey": req.route_params.get("id2"),
@@ -957,7 +954,6 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     return createJsonHttpResponse(404, "resource not found")
                 if len(queryEntities("activities", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
                     return createJsonHttpResponse(403, "must be the activity owner to delete media")
-                incrementDecrement("activities", auth["userid"], req.route_params.get("id"), "media", -1, True)
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
                     "RowKey": "mediaid",
@@ -965,11 +961,10 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     "id2": req.route_params.get("id2")
                 })
                 deleteEntity("media", req.route_params.get("id"), req.route_params.get("id2"))
+                incrementDecrement("activities", auth["userid"], req.route_params.get("id"), "media", -1, True)
             case "connection":
                 if len(queryEntities("connections", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) != 1:
                     return createJsonHttpResponse(404, "resource not found")
-                incrementDecrement("users", auth["userid"], "account", "connections", -1, True)
-                incrementDecrement("users", req.route_params.get("id"), "account", "connections", -1, True)
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
                     "RowKey": "userid",
@@ -977,8 +972,10 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 })
                 deleteEntity("connections", auth["userid"], req.route_params.get("id"))
                 deleteEntity("connections", req.route_params.get("id"), auth["userid"])
+                incrementDecrement("users", auth["userid"], "account", "connections", -1, True)
+                incrementDecrement("users", req.route_params.get("id"), "account", "connections", -1, True)
             case "prop":
-                if len(queryEntities("props", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + auth["userid"] + "'")) == 0:
+                if len(queryEntities("props", "PartitionKey eq '" + req.route_params.get("id2") + "' and RowKey eq '" + auth["userid"] + "'")) == 0:
                     return createJsonHttpResponse(400, "cannot delete prop")
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
