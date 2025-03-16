@@ -187,7 +187,7 @@ def queryEntities(table, filter, properties = None, aliases = {}, sortproperty =
             for a in aliases:
                 currentity[aliases[a]] = currentity.pop(a)
             response.append(currentity)
-    if sortproperty != None:
+    if sortproperty != None and len(allentities)>0:
         try:
             response.sort(key=lambda s: s[sortproperty], reverse=sortreverse)
         except:
@@ -328,7 +328,7 @@ def launderUnits(unitsystem, unittype, in_distance = None, in_time = None):
     return ""
 
 def launderTimezone(timestamp, timezone):
-    utctime = datetime.datetime.fromisoformat(timestamp)
+    utctime = parser.isoparse(timestamp)
     tztime = utctime.astimezone(pytz.timezone(timezone))
     formattime = tztime.strftime("%B %d at %I:%M %p")
     return formattime
@@ -563,7 +563,19 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
                     qme["mediafullurl"] = "data/mediafull/" + a["activityid"] + "/" + qme["mediaid"]
                 mediadata = qm
             a["media"] = mediadata
-            
+
+            # props
+            qe = queryEntities("props", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey","createtime"], {"RowKey": "userid"}, "createtime", True)
+            for e in qe:
+                e["createtime"] = launderTimezone(e["createtime"], auth["timezone"])
+            a["props"] = qe
+
+            # comments
+            qe = queryEntities("comments", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey","userid","createtime","comment"], {"RowKey": "commentid"}, "createtime", True)
+            for e in qe:
+                e["createtime"] = launderTimezone(e["createtime"], auth["timezone"])
+            a["comments"] = qe
+
             # launder
             activitytype = a["activitytype"]
             a_distance = a.get("distance",0)
@@ -673,14 +685,18 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="create/{type}", methods=[func.HttpMethod.POST])
+@app.route(route="create/{type}/{id?}/{id2?}", methods=[func.HttpMethod.POST])
 def create(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called create')
     try:
         auth = authorizer(req)
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-        body = req.get_json()
+        try:
+            body = req.get_json()
+        except:
+            if req.route_params.get("type") != "prop":
+                return createJsonHttpResponse(400, "bad json data")
         id = {}
         match req.route_params.get("type"):
             case "activity":
@@ -760,7 +776,34 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                         "connectiontype": "connected"
                     })
                     incrementDecrement("users", auth["userid"], 'account', "connections", 1, True)
-
+            case "prop":
+                if req.route_params.get("id") == auth["userid"]:
+                    return createJsonHttpResponse(400, "cannot prop self")
+                if len(queryEntities("activities", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'", userid=auth["userid"], connectionproperty="PartitionKey")) == 0:
+                    return createJsonHttpResponse(404, "userid and or activity not found")
+                if len(queryEntities("props", "PartitionKey eq '" + req.route_params.get("id2", "") + "' and RowKey eq '" + auth["userid"] + "'")) > 0:
+                    return createJsonHttpResponse(400, "prop already exists")
+                upsertEntity("props", {
+                    "PartitionKey": req.route_params.get("id2"),
+                    "RowKey": auth["userid"],
+                    "createtime": tsUnixToIso(time.time())
+                })
+            case "comment":
+                cjp = checkJsonProperties(body, [{"name":"comment","required":True}])
+                if not cjp["status"]:
+                    return createJsonHttpResponse(400, cjp["message"])
+                qe = queryEntities("activities", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'", userid=auth["userid"], connectionproperty="PartitionKey")
+                if len(qe) == 0:
+                    return createJsonHttpResponse(400, "userid and activityid mismatch, or no connection found")
+                commentid = str(uuid.uuid4())
+                upsertEntity("comments", {
+                    "PartitionKey": req.route_params.get("id2"),
+                    "RowKey": commentid,
+                    "userid": auth["userid"],
+                    "comment": body["comment"],
+                    "createtime": tsUnixToIso(time.time())
+                })
+                id["commentid"] = commentid
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(201, "create successful", id)
@@ -930,6 +973,25 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 })
                 deleteEntity("connections", auth["userid"], req.route_params.get("id"))
                 deleteEntity("connections", req.route_params.get("id"), auth["userid"])
+            case "prop":
+                if len(queryEntities("props", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + auth["userid"] + "'")) == 0:
+                    return createJsonHttpResponse(400, "cannot delete prop")
+                upsertEntity("deletions", {
+                    "PartitionKey": auth["userid"],
+                    "RowKey": "prop",
+                    "id": req.route_params.get("id")
+                })
+                deleteEntity("props", req.route_params.get("id"), auth["userid"])
+            case "comment":
+                if len(queryEntities("comments", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'")) == 0:
+                    return createJsonHttpResponse(400, "cannot delete comment")
+                upsertEntity("deletions", {
+                    "PartitionKey": auth["userid"],
+                    "RowKey": "comment",
+                    "id": req.route_params.get("id"),
+                    "id2": req.route_params.get("id2")
+                })
+                deleteEntity("comments", req.route_params.get("id"), req.route_params.get("id2"))
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(200, "delete successful")
