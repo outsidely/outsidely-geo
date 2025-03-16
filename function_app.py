@@ -431,9 +431,6 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties["ascent"] = statisticsdata["ascent"]
         activityproperties["descent"] = statisticsdata["descent"]
         activityproperties["starttime"] = statisticsdata["starttime"]
-        activityproperties["props"] = 0
-        activityproperties["media"] = 0
-        activityproperties["comments"] = 0
         activityproperties["gps"] = 1
 
         # capture distance for gear
