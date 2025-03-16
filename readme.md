@@ -81,6 +81,17 @@ Request
 }
 ```
 
+### POST /create/prop/{userid}/{activityid}
+No body is required to give props.
+
+### POST /create/comment/{userid}/{activityid}
+Request
+```json
+{
+    "comment": "the comment text"
+}
+```
+
 ### GET /read/gear
 Response
 ```json
@@ -211,6 +222,24 @@ Response
 ```
 
 ### DELETE /delete/connection/{userid}
+Response
+```json
+{
+    "statuscode": 200,
+    "message": "delete successful"
+}
+```
+
+### DELETE /delete/prop/{activityid}
+Response
+```json
+{
+    "statuscode": 200,
+    "message": "delete successful"
+}
+```
+
+### DELETE /delete/comment/{activityid}/{commentid}
 Response
 ```json
 {
