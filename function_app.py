@@ -457,7 +457,7 @@ def uploadmedia(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
         activityid = req.route_params.get("activityid")
         if len(queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + activityid + "'")) == 0:
-            return createJsonHttpResponse(404, "resource not found")
+            return createJsonHttpResponse(403, "must be owner of activity to upload media")
         if "upload" not in req.files.keys():
             return createJsonHttpResponse(400, "missing upload file")
         mediaid = str(uuid.uuid4())
@@ -904,6 +904,8 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
             case "media":
                 if len(queryEntities("activities", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
+                if len(queryEntities("activities", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
+                    return createJsonHttpResponse(403, "must be the activity owner to update media")
                 qe = queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'")
                 if len(qe) == 0:
                     return createJsonHttpResponse(404, "resource not found")
@@ -953,6 +955,8 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
             case "media":
                 if len(queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'")) != 1:
                     return createJsonHttpResponse(404, "resource not found")
+                if len(queryEntities("activities", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
+                    return createJsonHttpResponse(403, "must be the activity owner to delete media")
                 incrementDecrement("activities", auth["userid"], req.route_params.get("id"), "media", -1, True)
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
