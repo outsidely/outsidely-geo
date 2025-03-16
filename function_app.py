@@ -474,7 +474,6 @@ def uploadmedia(req: func.HttpRequest) -> func.HttpResponse:
                 for e in qe:
                     if e["sort"] > sort:
                         sort = e["sort"]
-            incrementDecrement("activities", auth["userid"], req.route_params.get("activityid"), "media", 1, True)
             upsertEntity("media",{
                 "PartitionKey": activityid,
                 "RowKey": mediaid,
@@ -773,6 +772,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                         "connectiontype": "connected"
                     })
                     incrementDecrement("users", auth["userid"], 'account', "connections", 1, True)
+                    incrementDecrement("users", body["userid"], 'account', "connections", 1, True)
             case "prop":
                 if req.route_params.get("id") == auth["userid"]:
                     return createJsonHttpResponse(400, "cannot prop self")
@@ -961,7 +961,6 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     "id2": req.route_params.get("id2")
                 })
                 deleteEntity("media", req.route_params.get("id"), req.route_params.get("id2"))
-                incrementDecrement("activities", auth["userid"], req.route_params.get("id"), "media", -1, True)
             case "connection":
                 if len(queryEntities("connections", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) != 1:
                     return createJsonHttpResponse(404, "resource not found")
