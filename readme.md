@@ -268,29 +268,23 @@ Objects should be in the array ordered by timestamp.
 [Google Doc Link](https://docs.google.com/spreadsheets/d/1w3IJKmRbWVmeEW3whp3uNintAZ6bExaaPi4kNrGqgR8/edit?usp=sharing)
 
 ## Work Items
-- Unclassified
-    - ~~Get gmail.com email -  outsidelyproject@gmail.com others were taken. ~~
-    - Rate limiting for all API calls combined to prevent abuse
-    - ~~Deletions table that logs primarykey=userid,rowkey=idtype (userid, activityid, mediaid, commentid, propid)~~
+- User invites and creation
+- User deletion
+- CRUD for comments and props
+- Map for the activity page w/ elevation profile and linked event support
+- Finalize activitytype approach (needs discussion, thought)
+    - gps: 1, 0
+    - assisted: 0, 1
+    - activitytype: run, ride, other
+        - stats happen at this level unless a subtype is requested?
+    - activitysubtype: run, walk, mountain bike, gravel - purely for display
+- Bugs or behavioral issues
     - Quirk: whenever the record is touched, the Timestamp changes. So if someone keeps updating their activity it will always jump to the top. Even if it's mega old. Probably want to implement some sort of check about if it's a lot older than the original posting time then filter it out?
     - Issue: consider activityid=710e05fd-61c8-456c-be38-5eb90ad1a045 why is the starttime wrong? device issue? 
-- High
-    - ~~Agree and implement auth scheme -  needed for gear, comments, media, and all user-based preferences~~
-- Medium
-    - CRUD stuff
-        - ~~Gear~~, comments, ~~media~~, props, connections
-    - ~~Activities response returns laundered information~~
-    - Map for the activity page w/ elevation profile and linked event support
-- Low
-    - Look at activities as a sort of hierarchy?
-        - gps: 1, 0
-        - assisted: 0, 1
-        - activitytype: run, ride, other
-            - stats happen at this level unless a subtype is requested
-        - activitysubtype: run, walk, mountain bike, gravel - purely for display
     - Activity starttime should probably be localized to where the person performed the activity? or is it just their usual timezone? How does this effect ordering?
-    - Weekly, Monthly, Yearly stats
 - Long term
+    - Rate limiting for all API calls combined to prevent abuse
+    - Weekly, Monthly, Yearly stat capability
     - Moving time
     - Smoothing for elevation
     - Smoothing for activity distance
