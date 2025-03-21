@@ -125,6 +125,15 @@ def deleteBlob(name):
         return False
     return True
 
+def listBlobs(startswith):
+    blobserviceclient = BlobServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
+    containerclient = blobserviceclient.get_container_client(os.environ["storagecontainer"])
+    blobs = containerclient.list_blobs(startswith)
+    bloblist = []
+    for b in blobs:
+        bloblist.append(b)
+    return bloblist
+
 def upsertEntity(table, entity):
     try:
         partitionKey = entity["PartitionKey"]
@@ -939,6 +948,10 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 deleteid = queryEntities("users", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq 'account'")[0]["salt"]
                 if req.route_params.get("id2", "") == deleteid:
                     activityids = queryEntities("activities", "PartitionKey eq '" + auth["userid"] + "'", ["PartitionKey","RowKey"], {"PartitionKey":"userid","RowKey": "activityid"})
+                    # blobs
+                    for e in activityids:
+                        for b in listBlobs(e["activityid"]):
+                            deleteBlob(b)
                     # props - does not delete props made by user on other activities
                     for e in activityids:
                         for e1 in queryEntities("props", "PartitionKey eq '" + e["activityid"] + "'", ["PartitionKey","RowKey"], {"PartitionKey": "activityid", "RowKey": "userid"}):

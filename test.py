@@ -1,8 +1,7 @@
-connections = ["1","2","3","4","5","6","7","8","9","10","11"]
+from azure.storage.blob import BlobServiceClient, BlobClient, ContentSettings
 
-def splitList(list, size):
-    for i in range(0, len(list), size):
-        yield list[i:i + size]
-
-for c in splitList(connections,10):
-    print(c)
+blobserviceclient = BlobServiceClient.from_connection_string("DefaultEndpointsProtocol=https;AccountName=outsidelystorage;AccountKey=41GZ5nit1vilCAa+nBxwGy9hvRz5WMsGugWGI2ICv3+XcFpxy/5z03i/AbKr7yvFl5l6mYgLJxJa+AStTw8fOw==;EndpointSuffix=core.windows.net")
+containerclient = blobserviceclient.get_container_client("outsidelycontainer")
+blobs = containerclient.list_blobs("0af27737-6d16-474c-8aea-0c5b953ed7ae")
+for b in blobs:
+    print(b.name)

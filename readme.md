@@ -324,6 +324,7 @@ Objects should be in the array ordered by timestamp.
     - Manual activity entries
     - Users can generate a code and invite new users (one code per new user)
     - Support video posting for media
+    - `delete/user` is not really complete. Users can't fully delete themselves because their comments they made on activities not their own are not deleted. There's no way to do so without doing full table scans. Option would be to build a crawling service that just checks every night by long running queries against a list of "find and delete this" in a table.
 - Reference
     - useful for smoothing distance https://stackoverflow.com/questions/47068504/where-to-find-python-implementation-of-chaikins-corner-cutting-algorithm
     - useful for smoothing elevation https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.CubicSpline.html#scipy.interpolate.CubicSpline
