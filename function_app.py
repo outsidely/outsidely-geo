@@ -933,6 +933,41 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
         match req.route_params.get("type"):
+            case "user":
+                if auth["userid"] != req.route_params.get("id"):
+                    return createJsonHttpResponse(403, "accounts can only be deleted by themselves")
+                deleteid = queryEntities("users", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq 'account'")[0]["salt"]
+                if req.route_params.get("id2", "") == deleteid:
+                    activityids = queryEntities("activities", "PartitionKey eq '" + auth["userid"] + "'", ["PartitionKey","RowKey"], {"PartitionKey":"userid","RowKey": "activityid"})
+                    # props - does not delete props made by user on other activities
+                    for e in activityids:
+                        for e1 in queryEntities("props", "PartitionKey eq '" + e["activityid"] + "'", ["PartitionKey","RowKey"], {"PartitionKey": "activityid", "RowKey": "userid"}):
+                            deleteEntity("props", e1["activityid"], e1["userid"])
+                    # comments - does not delete comments made by user on other activities
+                    for e in activityids:
+                        for e1 in queryEntities("comments", "PartitionKey eq '" + e["activityid"] + "'", ["PartitionKey","RowKey"], {"PartitionKey": "activityid", "RowKey": "commentid"}):
+                            deleteEntity("comments", e1["activityid"], e1["commentid"])
+                    # media
+                    for e in activityids:
+                        for e1 in queryEntities("media", "PartitionKey eq '" + e["activityid"] + "'", ["PartitionKey","RowKey"], {"PartitionKey": "activityid", "RowKey": "mediaid"}):
+                            deleteEntity("media", e1["activityid"], e1["mediaid"])
+                    # activities
+                    for e in activityids:
+                        deleteEntity("activities", e["userid"], e["activityid"])
+                    # connections
+                    for e in queryEntities("connections", "PartitionKey eq '" + auth["userid"] + "'"):
+                        deleteEntity("connections", e["PartitionKey"], e["RowKey"])
+                        deleteEntity("connections", e["RowKey"], e["PartitionKey"])
+                    # gear
+                    for e in queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "'"):
+                        deleteEntity("gear", e["PartitionKey"], e["RowKey"])
+                    # deletions
+                    for e in queryEntities("deletions", "PartitionKey eq '" + auth["userid"] + "'"):
+                        deleteEntity("deletions", e["PartitionKey"], e["RowKey"])
+                    # user
+                    deleteEntity("users", auth["userid"])
+                else:
+                    return createJsonHttpResponse(200, "to delete account, call delete/user/{deleteid}", {"deleteid": deleteid})
             case "activity":
                 qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") +  "'")
                 if len(qe) != 1:

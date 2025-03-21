@@ -3,7 +3,7 @@ import string
 import hashlib
 
 salt = ''
-password = ''
+password = 'test'
 
 if len(salt or "") == 0:
     salt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
