@@ -298,7 +298,6 @@ Objects should be in the array ordered by timestamp.
 
 ## Work Items
 - User invites and creation
-- User deletion
 - support "private" activities that are not seen by anyone except owner
 - Map for the activity page w/ elevation profile and linked event support
 - Finalize activitytype approach (needs discussion, thought)
@@ -312,6 +311,7 @@ Objects should be in the array ordered by timestamp.
     - Issue: consider activityid=710e05fd-61c8-456c-be38-5eb90ad1a045 why is the starttime wrong? device issue? 
     - Activity starttime should probably be localized to where the person performed the activity? or is it just their usual timezone? How does this effect ordering?
 - Long term
+    - Notifications support
     - Rate limiting for all API calls combined to prevent abuse
     - Weekly, Monthly, Yearly stat capability
     - Moving time
@@ -321,7 +321,6 @@ Objects should be in the array ordered by timestamp.
     - Privacy zones
     - Duplicate activity detection
     - Users get recovery codes since no email / other way to recover
-    - Manual activity entries
     - Users can generate a code and invite new users (one code per new user)
     - Support video posting for media
     - `delete/user` is not really complete. Users can't fully delete themselves because their comments they made on activities not their own are not deleted. There's no way to do so without doing full table scans. Option would be to build a crawling service that just checks every night by long running queries against a list of "find and delete this" in a table.
