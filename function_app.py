@@ -363,6 +363,17 @@ def useridIsConnection(userid, connectionuserid):
     else:
         return False
 
+@app.route(route="whoami", methods=[func.HttpMethod.GET])
+def whoami(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('called whoami')
+    try:
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+        return func.HttpResponse(json.dumps({"userid":auth["userid"]}), status_code=200, mimetype="application/json")
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
 @app.route(route="upload/activity", methods=[func.HttpMethod.POST])
 def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
 

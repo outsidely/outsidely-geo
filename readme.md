@@ -248,6 +248,16 @@ Response
 }
 ```
 
+### GET /whoami
+Returns information about the current user context.
+
+Response
+```json
+{
+    "userid":"jamund"
+}
+```
+
 ## Azure Resources
 - Resource Group: outsidely
 - Function App: outsidely-app-geo
