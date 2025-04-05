@@ -261,7 +261,7 @@ def authorizer(req):
         userid = ""
         unitsystem = "metric"
         timezone = "US/Eastern"
-    return {"authorized": authorized, "userid": "mamund", "unitsystem": unitsystem, "timezone": timezone}
+    return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": timezone}
 
 def checkJsonProperties(json, properties):
     matched = []
@@ -610,8 +610,10 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             # add gear, include track path for single activity response
             if not feedresponse:
                 if a.get("gearid", None) != None:
-                    a["gear"] = queryEntities("gear", "PartitionKey eq '" + a["userid"] + "' and RowKey eq '" + a["gearid"] + "'", ["RowKey","distance","name"], {"RowKey": "gearid"})[0]
-                    a["gear"]["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=a["gear"]["distance"])
+                    qe = queryEntities("gear", "PartitionKey eq '" + a["userid"] + "' and RowKey eq '" + a["gearid"] + "'", ["RowKey","distance","name"], {"RowKey": "gearid"})
+                    if len(qe)>0:
+                        a["gear"] = qe[0]
+                        a["gear"]["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=a["gear"]["distance"])
                 a["trackurl"] = "data/geojson/" + a["activityid"]
 
             # exclude certain properties and customize response based on type
