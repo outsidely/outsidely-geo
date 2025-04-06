@@ -43,6 +43,7 @@ Response
 - `id2` is optional for pulling nested data in some cases
 - `/data/preview/{activityid}` gets a preview for an activityid
 - `/data/geojson/{activityid}` gets a geojson for an activityid
+- `/data/activity/{activityid}` gets the raw activity data for an activityid
 - `/data/mediapreview/{activityid}/{mediaid}` gets a preview size media object
 - `/data/mediafull/{activityid}/{mediaid}` gets a full size media object
 

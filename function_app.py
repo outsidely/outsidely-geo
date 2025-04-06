@@ -656,6 +656,11 @@ def data(req: func.HttpRequest) -> func.HttpResponse:
                 gb = getBlob(req.route_params.get("id") + "/preview.jpg")
                 if not gb["status"]:
                     gb = getBlob(req.route_params.get("id") + "/preview.png")
+            case "activity":
+                try:
+                    gb = getBlob(req.route_params.get("id") + "/activitydata.json")
+                except:
+                    gb = getBlob(req.route_params.get("id") + "/activityData.json")
             case "geojson":
                 gb = getBlob(req.route_params.get("id") + "/geojson.json")
             case "mediapreview":
