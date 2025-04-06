@@ -7,7 +7,7 @@ GIS, data analysis, and APIs for the outsidely project. Utilizes Azure Functions
 ### POST /upload/activity
 - Upload a GPX of an activity using multi part form data
 - Required: upload (GPX as binary file), activitytype
-- Optional: name, description
+- Optional: name, description, private (0=default/1)
 
 Response 
 ```json
@@ -309,7 +309,6 @@ Objects should be in the array ordered by timestamp.
 
 ## Work Items
 - User invites and creation
-- support "private" activities that are not seen by anyone except owner
 - Map for the activity page w/ elevation profile and linked event support
 - Finalize activitytype approach (needs discussion, thought)
     - gps: 1, 0
