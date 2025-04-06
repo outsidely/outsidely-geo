@@ -311,6 +311,7 @@ Objects should be in the array ordered by timestamp.
 - User invites and creation
     - Users get recovery codes since no email / other way to recover
     - Users can generate a code and invite new users (one code per new user)
+    - userids are permanently held once created even after deletion, cannot then be used again
 - Finalize activitytype approach (needs discussion, thought)
     - gps: 1, 0
     - assisted: 0, 1
