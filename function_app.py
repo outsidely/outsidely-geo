@@ -363,6 +363,17 @@ def useridIsConnection(userid, connectionuserid):
     else:
         return False
 
+def createNotification(userid, message, options = []):
+    notificationid = str(uuid.uuid4())
+    options.append({"text":"Clear", "url":"delete/notification/" + notificationid, "method":"DELETE", "body": None})
+    upsertEntity("notifications", {
+        "PartitionKey": userid,
+        "RowKey": notificationid,
+        "message": message,
+        "createtime": tsUnixToIso(time.time()),
+        "options": json.dumps(options)
+    })
+
 @app.route(route="whoami", methods=[func.HttpMethod.GET])
 def whoami(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called whoami')
@@ -763,6 +774,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["RowKey"] = gearid
                 body["distance"] = float(0)
                 body["retired"] = str("0")
+                body["createtime"] = tsUnixToIso(time.time())
                 upsertEntity("gear", body)
                 id["gearid"] = gearid
             case "connection":
@@ -798,6 +810,13 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                         "RowKey": auth["userid"],
                         "connectiontype": "pending"
                     })
+                    createNotification(body["userid"], 
+                        auth["userid"] + " wants to connect with you.", 
+                        [
+                            {"text":"Connect","url":"create/connection","method":"POST","body":"{\"userid\":\"" + auth["userid"] + "\",\"connectiontype\":\"confirmed\"}"},
+                            {"text":"Reject","url":"create/connection","method":"POST","body":"{\"userid\":\"" + auth["userid"] + "\",\"connectiontype\":\"rejected\"}"}
+                        ]
+                    )
 
                 # if both users are confirmed, set to connected
                 if len(queryEntities("connections", "(PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + body["userid"] + "' and connectiontype eq 'confirmed') or (PartitionKey eq '" + body["userid"] + "' and RowKey eq '" + auth["userid"] + "' and connectiontype eq 'confirmed')")) == 2:
@@ -813,6 +832,8 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     })
                     incrementDecrement("users", auth["userid"], 'account', "connections", 1, True)
                     incrementDecrement("users", body["userid"], 'account', "connections", 1, True)
+                    createNotification(auth["userid"], "You are now connected to " + body["userid"] + ".")
+                    createNotification(body["userid"], "You are now connected to " + auth["userid"] + ".")
             case "prop":
                 if req.route_params.get("id") == auth["userid"]:
                     return createJsonHttpResponse(400, "cannot prop self")
@@ -891,6 +912,11 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
                     filter = " and connectiontype eq 'confirmed'"
                 qe = queryEntities("connections", "PartitionKey eq '" + userid + "'" + filter, ["RowKey", "connectiontype"], {"RowKey": "userid"})
                 return func.HttpResponse(json.dumps({"connections":qe}), status_code=200, mimetype="application/json")
+            case "notifications":
+                qe = queryEntities("notifications", "PartitionKey eq '" + auth["userid"] + "'", ["RowKey", "message", "createtime", "options"], {"RowKey": "notificationid"}, "createtime", True)
+                for e in qe:
+                    e["options"] = json.loads(e.get("options", ""))
+                return func.HttpResponse(json.dumps({"notifications":qe}), status_code=200, mimetype="application/json")
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
     except Exception as ex:
@@ -1076,6 +1102,15 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     "id2": req.route_params.get("id2")
                 })
                 deleteEntity("comments", req.route_params.get("id"), req.route_params.get("id2"))
+            case "notification":
+                if len(queryEntities("notifications", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
+                    return createJsonHttpResponse(400, "cannot delete notification")
+                upsertEntity("deletions", {
+                    "PartitionKey": auth["userid"],
+                    "RowKey": "notification",
+                    "id": req.route_params.get("id")
+                })
+                deleteEntity("notifications", auth["userid"], req.route_params.get("id"))
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(200, "delete successful")

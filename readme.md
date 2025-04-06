@@ -99,7 +99,7 @@ Response
 {
     "gear":[
         {
-            "timestamp": "2025-03-01T15:50:20.346135+00:00",
+            "createtime": "2025-03-01T15:50:20.346135+00:00",
             "activitytype": "ride",
             "distance": "laundered",
             "name": "GT Sensor",
@@ -108,7 +108,7 @@ Response
             "retired": 1
         },
         {
-            "timestamp": "2025-03-01T15:23:46.261960+00:00",
+            "createtime": "2025-03-01T15:23:46.261960+00:00",
             "activitytype": "ride",
             "distance": "laundered",
             "name": "Transition Sentinel",
@@ -161,6 +161,47 @@ Response
     "timezone": "America/New_York", 
     "unitsystem": "imperial",
     "email": "fake@email.com"
+}
+```
+
+### GET /read/notifications
+Response
+```json
+{
+    "notifications": [
+        {
+            "createtime": "2025-04-06T23:37:20Z",
+            "message": "Welcome to Outsidely!",
+            "options": [
+                {
+                    "text": "Clear",
+                    "url": "delete/notification/40465142-e525-4329-955d-c13b634e2c22",
+                    "method": "DELETE",
+                    "body": null
+                }
+            ],
+            "notificationid": "40465142-e525-4329-955d-c13b634e2c22"
+        },
+        {
+            "createtime": "2025-04-06T23:42:23Z",
+            "message": "mamund wants to connect with you.",
+            "options": [
+                {
+                    "text": "Connect",
+                    "url": "create/connection",
+                    "method": "POST",
+                    "body": "{\"userid\":\"mamund\",\"connectiontype\":\"confirmed\"}"
+                },
+                {
+                    "text": "Reject",
+                    "url": "create/connection",
+                    "method": "POST",
+                    "body": "{\"userid\":\"mamund\",\"connectiontype\":\"rejected\"}"
+                }
+            ],
+            "notificationid": "aaecf3e4-1c6a-4fd9-a2ec-8b4b5e384987"
+        }
+    ]
 }
 ```
 
@@ -241,6 +282,15 @@ Response
 ```
 
 ### DELETE /delete/comment/{activityid}/{commentid}
+Response
+```json
+{
+    "statuscode": 200,
+    "message": "delete successful"
+}
+```
+
+### DELETE /delete/notification/{notificationid}
 Response
 ```json
 {
