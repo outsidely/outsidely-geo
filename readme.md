@@ -309,7 +309,8 @@ Objects should be in the array ordered by timestamp.
 
 ## Work Items
 - User invites and creation
-- Map for the activity page w/ elevation profile and linked event support
+    - Users get recovery codes since no email / other way to recover
+    - Users can generate a code and invite new users (one code per new user)
 - Finalize activitytype approach (needs discussion, thought)
     - gps: 1, 0
     - assisted: 0, 1
@@ -330,8 +331,6 @@ Objects should be in the array ordered by timestamp.
     - Support using DEM-based elevation
     - Privacy zones
     - Duplicate activity detection
-    - Users get recovery codes since no email / other way to recover
-    - Users can generate a code and invite new users (one code per new user)
     - Support video posting for media
     - `delete/user` is not really complete. Users can't fully delete themselves because their comments they made on activities not their own are not deleted. There's no way to do so without doing full table scans. Option would be to build a crawling service that just checks every night by long running queries against a list of "find and delete this" in a table.
 - Reference
