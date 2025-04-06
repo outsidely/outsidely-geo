@@ -394,9 +394,16 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(400, "missing upload data of activity (GPX file)")
         
         activityproperties = {}
+
+        # validate activitytype
         activityproperties["activitytype"] = req.form.get("activitytype")
         if not validateData("activitytype", activityproperties["activitytype"])["status"]:
             createJsonHttpResponse(400, "invalid or missing activitytype")
+
+        # validate privacy setting
+        activityproperties["private"] = int(req.form.get("private", "0"))
+        if not validateData("private", activityproperties["private"])["status"]:
+            createJsonHttpResponse(400, "invalid setting for private")
 
         # validate gearid
         gearid = str(req.form.get("gearid") or "")
@@ -452,6 +459,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties["descent"] = statisticsdata["descent"]
         activityproperties["starttime"] = statisticsdata["starttime"]
         activityproperties["gps"] = 1
+        activityproperties["private"] = 0
 
         # capture distance for gear
         if len(gearid) > 0:
@@ -538,7 +546,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             if "userid" in req.route_params.keys():
                 filter += " and PartitionKey eq '" + req.route_params.get("userid") + "'"
 
-        activities = queryEntities("activities", 
+        allactivities = queryEntities("activities", 
             filter,
             aliases={"PartitionKey": "userid", "RowKey": "activityid"},
             sortproperty="starttime", 
@@ -546,6 +554,12 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             userid=auth["userid"],
             connectionproperty="PartitionKey")
 
+        # activity privacy
+        activities = []
+        for a in allactivities:
+            if ((a.get("private", 0) == 0) or (a.get("private", 0) == 1 and a.get("userid") == auth["userid"])):
+                activities.append(a)
+            
         userdata = {}
         activitytypes = {}
 
@@ -553,6 +567,8 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             activitytypes[e.get("RowKey")] = e.get("label")
         
         for a in activities:
+
+            a["private"] = a.get("private",0)
 
             if a.get("gps",1) == 1:
                 gps = True
