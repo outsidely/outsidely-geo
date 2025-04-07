@@ -438,6 +438,8 @@ Objects should be in the array ordered by timestamp.
     - activitytype: run, ride, other
         - stats happen at this level unless a subtype is requested?
     - activitysubtype: run, walk, mountain bike, gravel - purely for display
+- Limiting
+    - Need limits to protect the system: connections, comments, props, gear, invitations, recoveries, media, activities, etc.
 - Bugs or behavioral issues
     - Quirk: whenever the record is touched, the Timestamp changes. So if someone keeps updating their activity it will always jump to the top. Even if it's mega old. Probably want to implement some sort of check about if it's a lot older than the original posting time then filter it out?
     - Issue: consider activityid=710e05fd-61c8-456c-be38-5eb90ad1a045 why is the starttime wrong? device issue? 
