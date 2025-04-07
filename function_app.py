@@ -718,16 +718,133 @@ def validate(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="login", methods=[func.HttpMethod.GET])
 def login(req: func.HttpRequest) -> func.HttpResponse:
-
     logging.info('called login')
-
     try:
-        
         auth = authorizer(req)
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-
         return func.HttpResponse('<html><head><title>Outsidely Login</title></head><body><h1><a href="'+str(req.params.get("redirecturl") or "#")+'">Click here to go back</a></h1></body></html>', status_code=200, mimetype="text/html")
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
+@app.route(route="newuser/{id}/{id2}", methods=[func.HttpMethod.POST])
+def newuser(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('called newuser')
+    try:
+
+        try:
+            body = req.get_json()
+        except:
+            return createJsonHttpResponse(400, "bad json data")
+        id = {}
+
+        # validate body
+        cjp = checkJsonProperties(body, [{"name":"userid","required":True},{"name":"firstname", "required": True},{"name":"lastname", "required": True},{"name":"email","required":True},{"name":"password","required":True},{"name":"unitsystem", "validate": True}])
+        if not cjp["status"]:
+            return createJsonHttpResponse(400, cjp["message"])
+        
+        # validate invite
+        if len(queryEntities("invitations", "PartitionKey eq '" + req.route_params.get("id", "") + "' and RowKey eq '" + req.route_params.get("id2", "") + "' and invitationtype eq 'pending'")) == 0:
+            return createJsonHttpResponse(400, "invalid invitation information")
+        
+        # password stuff
+        if len(body["password"]) < 16:
+                return createJsonHttpResponse(400, "passwords must be at least 16 characters long")
+        salt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+        body["password"] = hashlib.sha512(str(salt + body["password"]).encode()).hexdigest()
+        body["salt"] = salt
+        
+        # userid not taken currently nor in past
+        cnt1 = len(queryEntities("users", "PartitionKey eq '" + body["userid"] + "'"))
+        cnt2 = len(queryEntities("deletions", "PartitionKey eq '" + body["userid"] + "' and userid eq '" + body["userid"] + "'"))
+        if (cnt1 + cnt2 > 0):
+            return createJsonHttpResponse(400, "userid taken")
+        
+        userid = body.pop("userid")
+        
+        # create user
+        body["PartitionKey"] = userid
+        body["RowKey"] = "account"
+        body["timezone"] = "US/Eastern"
+        body["unitsystem"] = "metric"
+        body["createtime"] = tsUnixToIso(time.time())
+
+        recoveryid = str(uuid.uuid4())
+        body["recoveryid"] = recoveryid
+        
+        upsertEntity("users", body)
+        id["userid"] = userid
+        id["recoveryid"] = recoveryid
+
+        # create first connection to the user who invited
+        upsertEntity("connections", {
+                "PartitionKey": req.route_params.get("id", ""),
+                "RowKey": userid,
+                "connectiontype": "connected"
+            })
+        upsertEntity("connections", {
+            "PartitionKey": userid,
+            "RowKey": req.route_params.get("id", ""),
+            "connectiontype": "connected"
+        })
+        incrementDecrement("users", req.route_params.get("id", ""), 'account', "connections", 1, True)
+        incrementDecrement("users", userid, 'account', "connections", 1, True)
+        createNotification(req.route_params.get("id", ""), "You are now connected to " + userid + ".")
+        createNotification(userid, "You are now connected to " + req.route_params.get("id", "") + ".")
+
+        # update invitation as accepted
+        upsertEntity("invitations", {
+            "PartitionKey": req.route_params.get("id", ""),
+            "RowKey": req.route_params.get("id2", ""),
+            "invitationtype": "accepted",
+            "userid": userid
+        })
+
+        # return
+        return createJsonHttpResponse(201, "create successful", id)
+    
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
+@app.route(route="recover/{id}/{id2}", methods=[func.HttpMethod.POST])
+def recover(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('called recover')
+    try:
+
+        try:
+            body = req.get_json()
+        except:
+            return createJsonHttpResponse(400, "bad json data")
+        
+        id = {}
+
+        # validate body
+        cjp = checkJsonProperties(body, [{"name":"password","required":True}])
+        if not cjp["status"]:
+            return createJsonHttpResponse(400, cjp["message"])
+        
+        # validate recoveryid
+        if len(queryEntities("users", "PartitionKey eq '" + req.route_params.get("id", "") + "' and RowKey eq 'account' and recoveryid eq '" + req.route_params.get("id2", "") + "'")) == 0:
+            return createJsonHttpResponse(400, "invalid recovery information")
+        
+        # password stuff
+        if len(body["password"]) < 16:
+                return createJsonHttpResponse(400, "passwords must be at least 16 characters long")
+        salt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+        body["password"] = hashlib.sha512(str(salt + body["password"]).encode()).hexdigest()
+        body["salt"] = salt
+
+        # update password, generate new recoveryid
+        body["PartitionKey"] = req.route_params.get("id", "")
+        body["RowKey"] = "account"
+        recoveryid = str(uuid.uuid4())
+        body["recoveryid"] = recoveryid
+        id["userid"] = req.route_params.get("id", "")
+        id["recoveryid"] = recoveryid
+        upsertEntity("users", body)
+
+        # response
+        return createJsonHttpResponse(200, "recovery succesful", id)
     
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
@@ -742,20 +859,20 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
         try:
             body = req.get_json()
         except:
-            if req.route_params.get("type") != "prop":
+            if req.route_params.get("type") != "prop" and req.route_params.get("type") != "invitation":
                 return createJsonHttpResponse(400, "bad json data")
         id = {}
         match req.route_params.get("type"):
-            case "invite":
-                inviteid = str(uuid.uuid4())
+            case "invitation":
+                if len(queryEntities("invitations", "PartitionKey eq '" + auth["userid"] + "' and Timestamp gt datetime'" + tsUnixToIso(int(time.time()) - 86400) + "'"))>10:
+                    return createJsonHttpResponse(400, "you may only create 10 invitations per day")
+                invitationid = str(uuid.uuid4())
                 upsertEntity("invitations", {
-                    "PrimaryKey": auth["userid"],
-                    "RowKey": inviteid,
+                    "PartitionKey": auth["userid"],
+                    "RowKey": invitationid,
                     "invitationtype": "pending"
                 })
-                id["activityid"] = activityid
-            case "user":
-                test = 1
+                id["invitationid"] = invitationid
             case "activity":
                 cjp = checkJsonProperties(body, [{"name":"activitytype","required":True, "validate": True},{"name":"ascent"},{"name":"distance"},{"name":"starttime","required":True},{"name":"time","required":True},{"name":"description"},{"name":"name"},{"name":"gearid"},{"name":"private","validate":True}])
                 if not cjp["status"]:
@@ -812,6 +929,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "RowKey": body["userid"],
                     "connectiontype": "confirmed"
                 })
+
                 # if this is the creation of the connection pair, add the other user as pending
                 qe = queryEntities("connections", "PartitionKey eq '" + body["userid"] + "' and RowKey eq '" + auth["userid"] + "'")
                 if len(qe) == 0:
@@ -894,7 +1012,7 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
                     return createJsonHttpResponse(404, "userid not found")
                 properties = ["PartitionKey","firstname", "lastname", "connections", "createtime"]
                 if auth["userid"] == userid:
-                    for p in ["unitsystem","timezone","email"]:
+                    for p in ["unitsystem","timezone","email","recoveryid"]:
                         properties.append(p)
                 qe = queryEntities("users", 
                                    "PartitionKey eq '" + userid + "' and RowKey eq 'account'", 
@@ -1049,6 +1167,12 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                         deleteEntity("deletions", e["PartitionKey"], e["RowKey"])
                     # user
                     deleteEntity("users", auth["userid"])
+                    # log
+                    upsertEntity("deletions", {
+                        "PartitionKey": auth["userid"],
+                        "RowKey": str(uuid.uuid4()),
+                        "userid": auth["userid"]
+                    })
                 else:
                     return createJsonHttpResponse(200, "to delete account, call delete/user/{deleteid}", {"deleteid": deleteid})
             case "activity":
@@ -1060,8 +1184,8 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"], False)
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
-                    "RowKey": "activityid",
-                    "id": req.route_params.get("id")
+                    "RowKey": str(uuid.uuid4()),
+                    "activityid": req.route_params.get("id")
                 })
                 deleteEntity("activities", auth["userid"], req.route_params.get("id"))
             case "media":
@@ -1071,9 +1195,9 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     return createJsonHttpResponse(403, "must be the activity owner to delete media")
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
-                    "RowKey": "mediaid",
-                    "id": req.route_params.get("id"),
-                    "id2": req.route_params.get("id2")
+                    "RowKey": str(uuid.uuid4()),
+                    "activityid": req.route_params.get("id"),
+                    "mediaid": req.route_params.get("id2")
                 })
                 deleteEntity("media", req.route_params.get("id"), req.route_params.get("id2"))
             case "connection":
@@ -1081,8 +1205,8 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     return createJsonHttpResponse(404, "resource not found")
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
-                    "RowKey": "userid",
-                    "id": req.route_params.get("id")
+                    "RowKey": str(uuid.uuid4()),
+                    "connectionid": req.route_params.get("id")
                 })
                 deleteEntity("connections", auth["userid"], req.route_params.get("id"))
                 deleteEntity("connections", req.route_params.get("id"), auth["userid"])
@@ -1093,8 +1217,8 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     return createJsonHttpResponse(400, "cannot delete prop")
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
-                    "RowKey": "prop",
-                    "id": req.route_params.get("id")
+                    "RowKey": str(uuid.uuid4()),
+                    "propid": req.route_params.get("id")
                 })
                 deleteEntity("props", req.route_params.get("id"), auth["userid"])
             case "comment":
@@ -1107,9 +1231,9 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     return createJsonHttpResponse(400, "cannot delete comment")
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
-                    "RowKey": "comment",
-                    "id": req.route_params.get("id"),
-                    "id2": req.route_params.get("id2")
+                    "RowKey": str(uuid.uuid4()),
+                    "activityid": req.route_params.get("id"),
+                    "commentid": req.route_params.get("id2")
                 })
                 deleteEntity("comments", req.route_params.get("id"), req.route_params.get("id2"))
             case "notification":
@@ -1117,8 +1241,8 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     return createJsonHttpResponse(400, "cannot delete notification")
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
-                    "RowKey": "notification",
-                    "id": req.route_params.get("id")
+                    "RowKey": str(uuid.uuid4()),
+                    "notificationid": req.route_params.get("id")
                 })
                 deleteEntity("notifications", auth["userid"], req.route_params.get("id"))
             case _:

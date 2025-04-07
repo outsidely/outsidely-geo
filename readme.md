@@ -30,6 +30,50 @@ Response
 }
 ```
 
+### POST /newuser/{userid}/{invitationid}
+- Fulfills an invitation and new user creation request
+- The `recoveryid` is very important as it represents the _only_ way to recover an account if the password is forgotten, see `recover` API.
+
+Request
+```json
+{
+    "userid": "unique userid that doesnt already exist in the system",
+    "email": "email",
+    "firstname": "firstname",
+    "lastname": "lastname",
+    "password": "password"
+}
+```
+
+Response 
+```json
+{
+    "statuscode": 201,
+    "message": "create successful",
+    "recoveryid": "<recoveryid>"
+}
+```
+
+### POST /recover/{userid}/{recoveryid}
+- Allows a user to reset their password if forgotten using a saved recoveryid
+- Returns a new recoveryid to be securely saved somewhere
+
+Request 
+```json
+{
+    "password": "<new password>"
+}
+```
+
+Response 
+```json
+{
+    "statuscode": 200,
+    "message": "recovery succesful",
+    "recoveryid": "<recoveryid>"
+}
+```
+
 ### GET /activities/{userid?}/{activityid?}
 - `/activities` will start at the current time and provide a feed of all activities as well as a continuation url to follow for more
 - `/activities/{userid}` will create a feed limited to the provided userid
@@ -377,9 +421,7 @@ Objects should be in the array ordered by timestamp.
 
 ## Work Items
 - User invites and creation
-    - Users get recovery codes since no email / other way to recover
-    - Users can generate a code and invite new users (one code per new user)
-    - userids are permanently held once created even after deletion, cannot then be used again
+    - recoveryid needs to be hashed/salted for security purposes
 - Finalize activitytype approach (needs discussion, thought)
     - gps: 1, 0
     - assisted: 0, 1
