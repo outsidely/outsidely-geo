@@ -155,6 +155,18 @@ Request
 }
 ```
 
+### POST /create/recoveryid
+Creates a new recoveryid for an account - the old one will immediately no longer be valid.
+
+Request
+```json
+{
+    "statuscode": 201, 
+    "message": "create successful", 
+    "recoveryid": "<recoveryid>"
+}
+```
+
 ### GET /read/gear
 Response
 ```json
