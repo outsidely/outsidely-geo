@@ -746,8 +746,18 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 return createJsonHttpResponse(400, "bad json data")
         id = {}
         match req.route_params.get("type"):
+            case "invite":
+                inviteid = str(uuid.uuid4())
+                upsertEntity("invitations", {
+                    "PrimaryKey": auth["userid"],
+                    "RowKey": inviteid,
+                    "invitationtype": "pending"
+                })
+                id["activityid"] = activityid
+            case "user":
+                test = 1
             case "activity":
-                cjp = checkJsonProperties(body, [{"name":"activitytype","required":True, "validate": True},{"name":"ascent"},{"name":"distance"},{"name":"starttime","required":True},{"name":"time","required":True},{"name":"description"},{"name":"name"},{"name":"gearid"}])
+                cjp = checkJsonProperties(body, [{"name":"activitytype","required":True, "validate": True},{"name":"ascent"},{"name":"distance"},{"name":"starttime","required":True},{"name":"time","required":True},{"name":"description"},{"name":"name"},{"name":"gearid"},{"name":"private","validate":True}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 if len(body.get("gearid",""))>0:

@@ -93,6 +93,24 @@ Request
 }
 ```
 
+### POST /create/activity
+Create a manual activity without a GPS file.
+
+Request
+```json
+{
+    "activitytype": "valide activitytype from validate/activitytypes",
+    "ascent": 123.4,
+    "descent": 123.4,
+    "starttime": "iso 8601 string",
+    "time": 312342,
+    "description": "string",
+    "name": "name",
+    "gearid": "valid gearid",
+    "private": "0 or 1"
+}
+```
+
 ### GET /read/gear
 Response
 ```json
