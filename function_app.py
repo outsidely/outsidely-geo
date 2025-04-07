@@ -743,6 +743,17 @@ def newuser(req: func.HttpRequest) -> func.HttpResponse:
         if not cjp["status"]:
             return createJsonHttpResponse(400, cjp["message"])
         
+        # validate userid
+        body["userid"] = body["userid"].lower()
+        if (not body["userid"].isalnum() or len(body["userid"])<2 or len(body["userid"])>20):
+            return createJsonHttpResponse(400, "userid can only contain alphanumeric characters and must be between 2 and 20 characters in length")
+
+        # userid not taken currently nor in past
+        cnt1 = len(queryEntities("users", "PartitionKey eq '" + body["userid"] + "'"))
+        cnt2 = len(queryEntities("deletions", "PartitionKey eq '" + body["userid"] + "' and userid eq '" + body["userid"] + "'"))
+        if (cnt1 + cnt2 > 0):
+            return createJsonHttpResponse(400, "userid taken")
+        
         # validate invite
         if len(queryEntities("invitations", "PartitionKey eq '" + req.route_params.get("id", "") + "' and RowKey eq '" + req.route_params.get("id2", "") + "' and invitationtype eq 'pending'")) == 0:
             return createJsonHttpResponse(400, "invalid invitation information")
@@ -753,13 +764,7 @@ def newuser(req: func.HttpRequest) -> func.HttpResponse:
         salt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
         body["password"] = hashlib.sha512(str(salt + body["password"]).encode()).hexdigest()
         body["salt"] = salt
-        
-        # userid not taken currently nor in past
-        cnt1 = len(queryEntities("users", "PartitionKey eq '" + body["userid"] + "'"))
-        cnt2 = len(queryEntities("deletions", "PartitionKey eq '" + body["userid"] + "' and userid eq '" + body["userid"] + "'"))
-        if (cnt1 + cnt2 > 0):
-            return createJsonHttpResponse(400, "userid taken")
-        
+
         userid = body.pop("userid")
         
         # create user
@@ -769,8 +774,10 @@ def newuser(req: func.HttpRequest) -> func.HttpResponse:
         body["unitsystem"] = "metric"
         body["createtime"] = tsUnixToIso(time.time())
 
-        recoveryid = str(uuid.uuid4())
-        body["recoveryid"] = recoveryid
+        recoveryid = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+        recoverysalt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+        body["recoveryid"] = hashlib.sha512(str(recoverysalt + body["recoveryid"]).encode()).hexdigest()
+        body["recoverysalt"] = recoverysalt
         
         upsertEntity("users", body)
         id["userid"] = userid
@@ -824,7 +831,10 @@ def recover(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(400, cjp["message"])
         
         # validate recoveryid
-        if len(queryEntities("users", "PartitionKey eq '" + req.route_params.get("id", "") + "' and RowKey eq 'account' and recoveryid eq '" + req.route_params.get("id2", "") + "'")) == 0:
+        qe = queryEntities("users", "PartitionKey eq '" + req.route_params.get("id", "") + "' and RowKey eq 'account'", ["recoverysalt", "recoveryid"])
+        if len(qe) == 0:
+            return createJsonHttpResponse(400, "invalid recovery information")
+        if hashlib.sha512(str(qe[0]["recoverysalt"] + req.route_params.get("id2", "")).encode()).hexdigest() != qe[0]["recoveryid"]:
             return createJsonHttpResponse(400, "invalid recovery information")
         
         # password stuff
@@ -834,11 +844,15 @@ def recover(req: func.HttpRequest) -> func.HttpResponse:
         body["password"] = hashlib.sha512(str(salt + body["password"]).encode()).hexdigest()
         body["salt"] = salt
 
-        # update password, generate new recoveryid
+        # new recoveryid
+        recoveryid = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+        recoverysalt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+        body["recoveryid"] = hashlib.sha512(str(recoverysalt + req.route_params.get("id2", "")).encode()).hexdigest()
+        body["recoverysalt"] = recoverysalt
+
+        # update record
         body["PartitionKey"] = req.route_params.get("id", "")
         body["RowKey"] = "account"
-        recoveryid = str(uuid.uuid4())
-        body["recoveryid"] = recoveryid
         id["userid"] = req.route_params.get("id", "")
         id["recoveryid"] = recoveryid
         upsertEntity("users", body)
@@ -859,10 +873,20 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
         try:
             body = req.get_json()
         except:
-            if req.route_params.get("type") != "prop" and req.route_params.get("type") != "invitation":
+            if req.route_params.get("type") != "prop" and req.route_params.get("type") != "invitation" and req.route_params.get("type") != "recoveryid":
                 return createJsonHttpResponse(400, "bad json data")
         id = {}
         match req.route_params.get("type"):
+            case "recoveryid":
+                recoveryid = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+                recoverysalt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+                body = {}
+                body["PartitionKey"] = auth["userid"]
+                body["RowKey"] = "account"
+                body["recoveryid"] = hashlib.sha512(str(recoverysalt + recoveryid).encode()).hexdigest()
+                body["recoverysalt"] = recoverysalt
+                id["recoveryid"] = recoveryid
+                upsertEntity("users", body)
             case "invitation":
                 if len(queryEntities("invitations", "PartitionKey eq '" + auth["userid"] + "' and Timestamp gt datetime'" + tsUnixToIso(int(time.time()) - 86400) + "'"))>10:
                     return createJsonHttpResponse(400, "you may only create 10 invitations per day")

@@ -420,8 +420,6 @@ Objects should be in the array ordered by timestamp.
 [Google Doc Link](https://docs.google.com/spreadsheets/d/1w3IJKmRbWVmeEW3whp3uNintAZ6bExaaPi4kNrGqgR8/edit?usp=sharing)
 
 ## Work Items
-- User invites and creation
-    - recoveryid needs to be hashed/salted for security purposes
 - Finalize activitytype approach (needs discussion, thought)
     - gps: 1, 0
     - assisted: 0, 1
