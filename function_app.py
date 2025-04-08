@@ -470,7 +470,6 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties["descent"] = statisticsdata["descent"]
         activityproperties["starttime"] = statisticsdata["starttime"]
         activityproperties["gps"] = 1
-        activityproperties["visibilitytype"] = 0
 
         # capture distance for gear
         if len(gearid) > 0:
