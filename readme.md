@@ -7,7 +7,7 @@ GIS, data analysis, and APIs for the outsidely project. Utilizes Azure Functions
 ### POST /upload/activity
 - Upload a GPX of an activity using multi part form data
 - Required: upload (GPX as binary file), activitytype
-- Optional: name, description, private (0=default/1)
+- Optional: name, description, visibilitytype (default='connections')
 
 Response 
 ```json
@@ -151,7 +151,7 @@ Request
     "description": "string",
     "name": "name",
     "gearid": "valid gearid",
-    "private": "0 or 1"
+    "visibilitytype": "validate visibilitytype from validate/visibilitytypes"
 }
 ```
 
@@ -179,7 +179,7 @@ Response
             "name": "GT Sensor",
             "userid": "jamund",
             "gearid": "088072ad-63b8-4a9b-846a-64ae793cf9e5",
-            "retired": 1
+            "geartype": "valid value from validate/geartype"
         },
         {
             "createtime": "2025-03-01T15:23:46.261960+00:00",
@@ -188,7 +188,7 @@ Response
             "name": "Transition Sentinel",
             "userid": "jamund",
             "gearid": "7d739518-23da-411b-8e35-3b4173ab94bc",
-            "retired": 0
+            "geartype": "valid value from validate/geartype"
         }
     ]
 }
@@ -306,7 +306,7 @@ Request
 {
     "name": "name of the piece of gear",
     "activitytype": "a valid value from /validate/activitytype",
-    "retired": "a valid value from /validate/retired"
+    "geartype": "a valid value from /validate/geartype"
 }
 ```
 
