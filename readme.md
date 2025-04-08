@@ -437,7 +437,7 @@ Objects should be in the array ordered by timestamp.
     - assisted: 0, 1
     - activitytype: run, ride, other
         - stats happen at this level unless a subtype is requested?
-    - activitysubtype: run, walk, mountain bike, gravel - purely for display
+    - activitysubtype: run, walk, mountain bike, gravel - purely for display?
 - Limiting
     - Need limits to protect the system: connections, comments, props, gear, invitations, recoveries, media, activities, etc.
 - Bugs or behavioral issues
@@ -445,17 +445,17 @@ Objects should be in the array ordered by timestamp.
     - Issue: consider activityid=710e05fd-61c8-456c-be38-5eb90ad1a045 why is the starttime wrong? device issue? 
     - Activity starttime should probably be localized to where the person performed the activity? or is it just their usual timezone? How does this effect ordering?
 - Long term
-    - Notifications support
     - Rate limiting for all API calls combined to prevent abuse
     - Weekly, Monthly, Yearly stat capability
     - Moving time
     - Smoothing for elevation
     - Smoothing for activity distance
     - Support using DEM-based elevation
-    - Privacy zones
+    - Privacy zone support for thumbnails and for detail map
     - Duplicate activity detection
     - Support video posting for media
     - `delete/user` is not really complete. Users can't fully delete themselves because their comments they made on activities not their own are not deleted. There's no way to do so without doing full table scans. Option would be to build a crawling service that just checks every night by long running queries against a list of "find and delete this" in a table.
+    - Split out APIs into more logical functions - for example there should be a service for thumbnail creation so activities don't fail to be created without it succeeding.
 - Reference
     - useful for smoothing distance https://stackoverflow.com/questions/47068504/where-to-find-python-implementation-of-chaikins-corner-cutting-algorithm
     - useful for smoothing elevation https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.CubicSpline.html#scipy.interpolate.CubicSpline
