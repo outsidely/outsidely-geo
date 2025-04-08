@@ -897,7 +897,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 })
                 id["invitationid"] = invitationid
             case "activity":
-                cjp = checkJsonProperties(body, [{"name":"activitytype","required":True, "validate": True},{"name":"ascent"},{"name":"distance"},{"name":"starttime","required":True},{"name":"time","required":True},{"name":"description"},{"name":"name"},{"name":"gearid"},{"name":"visibilitytype","validate":True}])
+                cjp = checkJsonProperties(body, [{"name":"activitytype","required":True, "validate": True},{"name":"ascent"},{"name":"distance"},{"name":"starttime","required":True},{"name":"time","required":True},{"name":"description"},{"name":"name"},{"name":"gearid"},{"name":"visibilitytype","validate":True,"required":True}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 if len(body.get("gearid",""))>0:
