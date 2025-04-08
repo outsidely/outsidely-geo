@@ -412,14 +412,14 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
             createJsonHttpResponse(400, "invalid or missing activitytype")
 
         # validate privacy setting
-        activityproperties["private"] = int(req.form.get("private", "0"))
-        if not validateData("private", activityproperties["private"])["status"]:
-            createJsonHttpResponse(400, "invalid setting for private")
+        activityproperties["visibilitytype"] = req.form.get("visibilitytype", "connections")
+        if not validateData("visibilitytype", activityproperties["visibilitytype"])["status"]:
+            createJsonHttpResponse(400, "invalid setting for visibilitytype")
 
         # validate gearid
         gearid = str(req.form.get("gearid") or "")
         if len(gearid) > 0:
-            gearentity = queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + gearid + "' and retired eq '0' and activitytype eq '" + activityproperties["activitytype"] + "'")
+            gearentity = queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + gearid + "' and geartype eq 'active' and activitytype eq '" + activityproperties["activitytype"] + "'")
             if len(gearentity) != 1:
                 return createJsonHttpResponse(400, "invalid gearid")
             activityproperties["gearid"] = gearid
@@ -470,7 +470,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties["descent"] = statisticsdata["descent"]
         activityproperties["starttime"] = statisticsdata["starttime"]
         activityproperties["gps"] = 1
-        activityproperties["private"] = 0
+        activityproperties["visibilitytype"] = 0
 
         # capture distance for gear
         if len(gearid) > 0:
@@ -568,7 +568,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         # activity privacy
         activities = []
         for a in allactivities:
-            if ((a.get("private", 0) == 0) or (a.get("private", 0) == 1 and a.get("userid") == auth["userid"])):
+            if ((a.get("visibilitytype", "") != "private") or (a.get("userid") == auth["userid"])):
                 activities.append(a)
             
         userdata = {}
@@ -579,7 +579,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         
         for a in activities:
 
-            a["private"] = a.get("private",0)
+            a["visibilitytype"] = a.get("visibilitytype","connections")
 
             if a.get("gps",1) == 1:
                 gps = True
@@ -898,7 +898,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 })
                 id["invitationid"] = invitationid
             case "activity":
-                cjp = checkJsonProperties(body, [{"name":"activitytype","required":True, "validate": True},{"name":"ascent"},{"name":"distance"},{"name":"starttime","required":True},{"name":"time","required":True},{"name":"description"},{"name":"name"},{"name":"gearid"},{"name":"private","validate":True}])
+                cjp = checkJsonProperties(body, [{"name":"activitytype","required":True, "validate": True},{"name":"ascent"},{"name":"distance"},{"name":"starttime","required":True},{"name":"time","required":True},{"name":"description"},{"name":"name"},{"name":"gearid"},{"name":"visibilitytype","validate":True}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 if len(body.get("gearid",""))>0:
@@ -924,7 +924,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = gearid
                 body["distance"] = float(0)
-                body["retired"] = str("0")
+                body["geartype"] = str("active")
                 body["createtime"] = tsUnixToIso(time.time())
                 upsertEntity("gear", body)
                 id["gearid"] = gearid
@@ -1108,9 +1108,9 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 body["RowKey"] = req.route_params.get("id")
                 upsertEntity("activities", body)
             case "gear":
-                if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "' and retired eq 0")) == 0:
+                if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "' and geartype eq 'active'")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
-                cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"retired","validate":True}])
+                cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"geartype","validate":True}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 body["PartitionKey"] = auth["userid"]
