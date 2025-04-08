@@ -1203,7 +1203,7 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") +  "'")
                 if len(qe) != 1:
                     return createJsonHttpResponse(404, "resource not found")
-                # validate gearid
+                # gear distance capture change
                 if "gearid" in qe[0].keys():
                     incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"], False)
                 upsertEntity("deletions", {
@@ -1211,6 +1211,16 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     "RowKey": str(uuid.uuid4()),
                     "activityid": req.route_params.get("id")
                 })
+                # media
+                for e in queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "'"):
+                    deleteEntity("media", e["PartitionKey"], e["RowKey"])
+                # comments
+                for e in queryEntities("comments", "PartitionKey eq '" + req.route_params.get("id") + "'"):
+                    deleteEntity("comments", e["PartitionKey"], e["RowKey"])
+                # props
+                for e in queryEntities("props", "PartitionKey eq '" + req.route_params.get("id") + "'"):
+                    deleteEntity("props", e["PartitionKey"], e["RowKey"])
+                #activity
                 deleteEntity("activities", auth["userid"], req.route_params.get("id"))
             case "media":
                 if len(queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'")) != 1:
