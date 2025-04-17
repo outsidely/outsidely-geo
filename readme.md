@@ -438,6 +438,7 @@ Objects should be in the array ordered by timestamp.
     - activitytype: run, ride, other
         - stats happen at this level unless a subtype is requested?
     - activitysubtype: run, walk, mountain bike, gravel - purely for display?
+- Think through notifications - what triggers them? Comments made, props given, connections post activities, etc.
 - Limiting
     - Need limits to protect the system: connections, comments, props, gear, invitations, recoveries, media, activities, etc.
 - Bugs or behavioral issues
