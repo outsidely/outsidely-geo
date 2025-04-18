@@ -1246,12 +1246,12 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 incrementDecrement("users", auth["userid"], "account", "connections", -1, True)
                 incrementDecrement("users", req.route_params.get("id"), "account", "connections", -1, True)
             case "prop":
-                if len(queryEntities("props", "PartitionKey eq '" + req.route_params.get("id2") + "' and RowKey eq '" + auth["userid"] + "'")) == 0:
+                if len(queryEntities("props", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + auth["userid"] + "'")) == 0:
                     return createJsonHttpResponse(400, "cannot delete prop")
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
                     "RowKey": str(uuid.uuid4()),
-                    "propid": req.route_params.get("id")
+                    "activityid": req.route_params.get("id")
                 })
                 deleteEntity("props", req.route_params.get("id"), auth["userid"])
             case "comment":
