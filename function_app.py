@@ -997,6 +997,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "RowKey": auth["userid"],
                     "createtime": tsUnixToIso(time.time())
                 })
+                createNotification(req.route_params.get("id"), auth["userid"] + " gave you props on <a href=\"#\">your activity</a>.")
             case "comment":
                 cjp = checkJsonProperties(body, [{"name":"comment","required":True}])
                 if not cjp["status"]:
@@ -1013,6 +1014,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "createtime": tsUnixToIso(time.time())
                 })
                 id["commentid"] = commentid
+                createNotification(req.route_params.get("id"), auth["userid"] + " left a comment on <a href=\"#\">your activity</a>.")
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(201, "create successful", id)
