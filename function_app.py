@@ -1020,7 +1020,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "createtime": tsUnixToIso(time.time())
                 })
                 id["commentid"] = commentid
-                if req.route_params.get("id") != auth["userid"] or 1==1:
+                if req.route_params.get("id") != auth["userid"]:
                     createNotification(req.route_params.get("id"), auth["userid"] + " left a comment on your activity.", properties={"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
