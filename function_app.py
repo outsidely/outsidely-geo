@@ -416,6 +416,10 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         if not validateData("private", activityproperties["private"])["status"]:
             createJsonHttpResponse(400, "invalid setting for private")
 
+        # name required
+        if req.form.get("name", "") == "":
+            createJsonHttpResponse(400, "name is required for activity")
+
         # validate gearid
         gearid = str(req.form.get("gearid") or "")
         if len(gearid) > 0:
@@ -898,7 +902,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 })
                 id["invitationid"] = invitationid
             case "activity":
-                cjp = checkJsonProperties(body, [{"name":"activitytype","required":True, "validate": True},{"name":"ascent"},{"name":"distance"},{"name":"starttime","required":True},{"name":"time","required":True},{"name":"description"},{"name":"name"},{"name":"gearid"},{"name":"private","validate":True}])
+                cjp = checkJsonProperties(body, [{"name":"activitytype","required":True, "validate": True},{"name":"ascent"},{"name":"distance"},{"name":"starttime","required":True},{"name":"time","required":True},{"name":"description"},{"name":"name","required":True},{"name":"gearid"},{"name":"private","validate":True}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 if len(body.get("gearid",""))>0:
@@ -1049,7 +1053,6 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
                     gearfilter += " and RowKey eq '" + req.route_params.get("id") + "'"
                 qe = queryEntities("gear","PartitionKey eq '" + auth["userid"] + "'" + gearfilter, aliases={"PartitionKey":"userid","RowKey":"gearid"}, sortproperty="timestamp", sortreverse=True)
                 for e in qe:
-                    e["activitytype"] = validateData("activitytype", e["activitytype"]).get("label")
                     e["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=e["distance"])
                 return func.HttpResponse(json.dumps({"gear":qe}), status_code=200, mimetype="application/json")
             case "connections":
@@ -1068,6 +1071,7 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
                 qe = queryEntities("notifications", "PartitionKey eq '" + auth["userid"] + "'", ["RowKey", "message", "createtime", "options"], {"RowKey": "notificationid"}, "createtime", True)
                 for e in qe:
                     e["options"] = json.loads(e.get("options", ""))
+                    e["createtime"] = launderTimezone(e["createtime"], auth["timezone"])
                 return func.HttpResponse(json.dumps({"notifications":qe}), status_code=200, mimetype="application/json")
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
