@@ -423,7 +423,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         # validate gearid
         gearid = str(req.form.get("gearid") or "")
         if len(gearid) > 0:
-            gearentity = queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + gearid + "' and retired eq '0' and activitytype eq '" + activityproperties["activitytype"] + "'")
+            gearentity = queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + gearid + "' and geartype eq 'active' and activitytype eq '" + activityproperties["activitytype"] + "'")
             if len(gearentity) != 1:
                 return createJsonHttpResponse(400, "invalid gearid")
             activityproperties["gearid"] = gearid
@@ -474,7 +474,6 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties["descent"] = statisticsdata["descent"]
         activityproperties["starttime"] = statisticsdata["starttime"]
         activityproperties["gps"] = 1
-        activityproperties["private"] = 0
 
         # capture distance for gear
         if len(gearid) > 0:
@@ -572,7 +571,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         # activity privacy
         activities = []
         for a in allactivities:
-            if ((a.get("private", 0) == 0) or (a.get("private", 0) == 1 and a.get("userid") == auth["userid"])):
+            if ((a.get("visibilitytype", "") != "private") or (a.get("userid") == auth["userid"])):
                 activities.append(a)
             
         userdata = {}
@@ -583,7 +582,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         
         for a in activities:
 
-            a["private"] = a.get("private",0)
+            a["visibilitytype"] = a.get("visibilitytype","connections")
 
             if a.get("gps",1) == 1:
                 gps = True
@@ -906,7 +905,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 if len(body.get("gearid",""))>0:
-                    if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and name eq '" + body["gearid"] + "'")) == 0:
+                    if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and name eq '" + body["gearid"] + "' and activitytype eq '" + body["activitytype"] + "'")) == 0:
                         return createJsonHttpResponse(400, "gearid not found")
                 activityid = str(uuid.uuid4())
                 body["PartitionKey"] = auth["userid"]
@@ -928,7 +927,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = gearid
                 body["distance"] = float(0)
-                body["retired"] = str("0")
+                body["geartype"] = str("active")
                 body["createtime"] = tsUnixToIso(time.time())
                 upsertEntity("gear", body)
                 id["gearid"] = gearid
@@ -1002,6 +1001,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "RowKey": auth["userid"],
                     "createtime": tsUnixToIso(time.time())
                 })
+                createNotification(req.route_params.get("id"), auth["userid"] + " gave you props on <a href=\"#\">your activity</a>.")
             case "comment":
                 cjp = checkJsonProperties(body, [{"name":"comment","required":True}])
                 if not cjp["status"]:
@@ -1018,6 +1018,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "createtime": tsUnixToIso(time.time())
                 })
                 id["commentid"] = commentid
+                createNotification(req.route_params.get("id"), auth["userid"] + " left a comment on <a href=\"#\">your activity</a>.")
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(201, "create successful", id)
@@ -1112,9 +1113,9 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 body["RowKey"] = req.route_params.get("id")
                 upsertEntity("activities", body)
             case "gear":
-                if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "' and retired eq 0")) == 0:
+                if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "' and geartype eq 'active'")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
-                cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"retired","validate":True}])
+                cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"geartype","validate":True}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 body["PartitionKey"] = auth["userid"]
@@ -1207,7 +1208,7 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") +  "'")
                 if len(qe) != 1:
                     return createJsonHttpResponse(404, "resource not found")
-                # validate gearid
+                # gear distance capture change
                 if "gearid" in qe[0].keys():
                     incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"], False)
                 upsertEntity("deletions", {
@@ -1215,6 +1216,16 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     "RowKey": str(uuid.uuid4()),
                     "activityid": req.route_params.get("id")
                 })
+                # media
+                for e in queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "'"):
+                    deleteEntity("media", e["PartitionKey"], e["RowKey"])
+                # comments
+                for e in queryEntities("comments", "PartitionKey eq '" + req.route_params.get("id") + "'"):
+                    deleteEntity("comments", e["PartitionKey"], e["RowKey"])
+                # props
+                for e in queryEntities("props", "PartitionKey eq '" + req.route_params.get("id") + "'"):
+                    deleteEntity("props", e["PartitionKey"], e["RowKey"])
+                #activity
                 deleteEntity("activities", auth["userid"], req.route_params.get("id"))
             case "media":
                 if len(queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + req.route_params.get("id2") + "'")) != 1:
@@ -1241,12 +1252,12 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 incrementDecrement("users", auth["userid"], "account", "connections", -1, True)
                 incrementDecrement("users", req.route_params.get("id"), "account", "connections", -1, True)
             case "prop":
-                if len(queryEntities("props", "PartitionKey eq '" + req.route_params.get("id2") + "' and RowKey eq '" + auth["userid"] + "'")) == 0:
+                if len(queryEntities("props", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + auth["userid"] + "'")) == 0:
                     return createJsonHttpResponse(400, "cannot delete prop")
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
                     "RowKey": str(uuid.uuid4()),
-                    "propid": req.route_params.get("id")
+                    "activityid": req.route_params.get("id")
                 })
                 deleteEntity("props", req.route_params.get("id"), auth["userid"])
             case "comment":
