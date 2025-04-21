@@ -363,7 +363,7 @@ def useridIsConnection(userid, connectionuserid):
     else:
         return False
 
-def createNotification(userid, message, options = []):
+def createNotification(userid, message, options = [], properties = {}):
     notificationid = str(uuid.uuid4())
     options.append({"text":"Clear", "url":"delete/notification/" + notificationid, "method":"DELETE", "body": None})
     upsertEntity("notifications", {
@@ -371,7 +371,8 @@ def createNotification(userid, message, options = []):
         "RowKey": notificationid,
         "message": message,
         "createtime": tsUnixToIso(time.time()),
-        "options": json.dumps(options)
+        "options": json.dumps(options),
+        "properties": json.dumps(properties)
     })
 
 @app.route(route="whoami", methods=[func.HttpMethod.GET])
@@ -1001,7 +1002,8 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "RowKey": auth["userid"],
                     "createtime": tsUnixToIso(time.time())
                 })
-                createNotification(req.route_params.get("id"), auth["userid"] + " gave you props on <a href=\"#\">your activity</a>.")
+                if req.route_params.get("id") != auth["userid"]:
+                    createNotification(req.route_params.get("id"), auth["userid"] + " gave you props on your activity.", properties={"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
             case "comment":
                 cjp = checkJsonProperties(body, [{"name":"comment","required":True}])
                 if not cjp["status"]:
@@ -1018,7 +1020,8 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "createtime": tsUnixToIso(time.time())
                 })
                 id["commentid"] = commentid
-                createNotification(req.route_params.get("id"), auth["userid"] + " left a comment on <a href=\"#\">your activity</a>.")
+                if req.route_params.get("id") != auth["userid"] or 1==1:
+                    createNotification(req.route_params.get("id"), auth["userid"] + " left a comment on your activity.", properties={"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(201, "create successful", id)
@@ -1069,9 +1072,10 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
                 qe = queryEntities("connections", "PartitionKey eq '" + userid + "'" + filter, ["RowKey", "connectiontype"], {"RowKey": "userid"})
                 return func.HttpResponse(json.dumps({"connections":qe}), status_code=200, mimetype="application/json")
             case "notifications":
-                qe = queryEntities("notifications", "PartitionKey eq '" + auth["userid"] + "'", ["RowKey", "message", "createtime", "options"], {"RowKey": "notificationid"}, "createtime", True)
+                qe = queryEntities("notifications", "PartitionKey eq '" + auth["userid"] + "'", ["RowKey", "message", "createtime", "options", "properties"], {"RowKey": "notificationid"}, "createtime", True)
                 for e in qe:
-                    e["options"] = json.loads(e.get("options", ""))
+                    e["options"] = json.loads(e.get("options", "{}"))
+                    e["properties"] = json.loads(e.get("properties", "[]"))
                     e["createtime"] = launderTimezone(e["createtime"], auth["timezone"])
                 return func.HttpResponse(json.dumps({"notifications":qe}), status_code=200, mimetype="application/json")
             case _:
