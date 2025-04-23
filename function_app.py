@@ -413,9 +413,9 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
             createJsonHttpResponse(400, "invalid or missing activitytype")
 
         # validate privacy setting
-        activityproperties["private"] = int(req.form.get("private", "0"))
-        if not validateData("private", activityproperties["private"])["status"]:
-            createJsonHttpResponse(400, "invalid setting for private")
+        activityproperties["visibilitytype"] = req.form.get("visibilitytype", "private")
+        if not validateData("visibilitytype", activityproperties["visibilitytype"])["status"]:
+            createJsonHttpResponse(400, "invalid setting for visibilitytype")
 
         # name required
         if req.form.get("name", "") == "":
