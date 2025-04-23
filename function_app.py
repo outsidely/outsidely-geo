@@ -1110,9 +1110,14 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
             case "activity":
                 if len(queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
-                cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"description"}])
+                cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"description"},{"name":"visibilitytype","validate":True},{"name":"gearid"}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
+                if len(body.get("gearid",""))>0:
+                    if body.get("activitytype","") == "":
+                        return createJsonHttpResponse(400, "activitytype is required when updating gearid")
+                    if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and name eq '" + body["gearid"] + "' and activitytype eq '" + body["activitytype"] + "'")) == 0:
+                        return createJsonHttpResponse(400, "gearid not found")
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = req.route_params.get("id")
                 upsertEntity("activities", body)
