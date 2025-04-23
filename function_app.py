@@ -575,7 +575,6 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             if ((a.get("visibilitytype", "") != "private") or (a.get("userid") == auth["userid"])):
                 activities.append(a)
             
-        userdata = {}
         activitytypes = {}
 
         for e in queryEntities("validate", "PartitionKey eq 'activitytype'"):
@@ -592,14 +591,6 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
 
             if gps:
                 a["previewurl"] = "data/preview/" + a["activityid"]
-
-            # normalize
-            if a["userid"] not in userdata.keys():
-                qu = queryEntities("users","PartitionKey eq '" + a["userid"] + "' and RowKey eq 'account'")
-                userdata[a["userid"]] = {"firstname": qu[0]["firstname"], "lastname": qu[0]["lastname"]}
-            if len(userdata) > 0:
-                a["firstname"] = userdata[a["userid"]]["firstname"]
-                a["lastname"] = userdata[a["userid"]]["lastname"]
 
             # media
             qe = queryEntities("media", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey", "sort"], {"RowKey": "mediaid"}, "sort")
@@ -621,17 +612,15 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             a["comments"] = qe
 
             # launder
-            activitytype = a["activitytype"]
             a_distance = a.get("distance",0)
             a_time = a.get("time",0)
             a_ascent = a.get("ascent",0)
             a_descent = a.get("descent",0)
-            a["activitytype"] = activitytypes[a["activitytype"]]
             a["time"] = launderUnits(auth["unitsystem"], "time", in_time=a_time)
             a["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=a_distance)
             a["ascent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=a_ascent)
             a["descent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=a_descent)
-            if activitytype == "run":
+            if a["activitytype"] == "run":
                 a["speed"] = launderUnits(auth["unitsystem"], "pace", in_distance=a_distance, in_time=a_time)
             else:
                 a["speed"] = launderUnits(auth["unitsystem"], "speed", in_distance=a_distance, in_time=a_time)
