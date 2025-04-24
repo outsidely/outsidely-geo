@@ -22,6 +22,8 @@ from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient, BlobClient, ContentSettings
 from azure.data.tables import TableServiceClient, TableClient, UpdateMode
 from PIL import Image
+from http.cookies import SimpleCookie
+import urllib.parse
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -244,6 +246,17 @@ def validateData(validationtype, value):
         return {"status": True, "label": qe[0]["label"]}
 
 def authorizer(req):
+
+    # cookie method first
+    sc = SimpleCookie()
+    sc.load(req.headers.get("Cookie", ""))
+    if "outsidelycookie" in sc.keys():
+        userid = sc["outsidelycookie"].value.split(":")[0]
+        password = sc["outsidelycookie"].value.split(":")[1]
+        qe = queryEntities("users", "PartitionKey eq '" + userid + "' and password eq '" + password + "'", ["salt", "password", "unitsystem", "timezone"])
+        return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": timezone}
+    
+    # basic authorization header method second
     try:
         authorized = False
         parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
@@ -716,7 +729,52 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
         auth = authorizer(req)
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><body><h1><a href="'+str(req.params.get("redirecturl") or "#")+'">Click here to go back</a></h1></body></html>', status_code=200, mimetype="text/html")
+        redirecturl = req.params.get("redirecturl", "#")
+        if "?" in redirecturl:
+            redirecturl += "&"
+        else:
+            redirecturl += "?"
+        redirecturl += "token=" + urllib.parse.quote_plus(req.headers.get("Authorization"))
+        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><body><h1><a href="'+str(redirecturl)+'">Click here to go back</a></h1></body></html>', 
+                                 status_code=200, 
+                                 mimetype="text/html")
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
+@app.route(route="login2", methods=[func.HttpMethod.POST])
+def login2(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('called login2')
+    try:
+
+        # accepts body of userid and password
+        try:
+            body = req.get_json()
+        except:
+            return createJsonHttpResponse(400, "bad json data")
+        
+        authorized = False
+        qe = queryEntities("users", "PartitionKey eq '" + body['userid'] + "' and RowKey eq 'account'", ["salt", "password", "unitsystem", "timezone"])
+        if len(qe) > 0:
+            salt = qe[0]["salt"]
+            if hashlib.sha512(str(salt + body['password']).encode()).hexdigest() == qe[0]["password"]:
+                authorized = True
+
+        if authorized:
+            # set cookie
+            sc = SimpleCookie()
+            sc["outsidelycookie"] = body['userid'] + ":" + qe[0]["password"]
+            sc["outsidelycookie"]["path"] = "/"
+            sc["outsidelycookie"]["max-age"] = 60*60*24*30
+            sc["outsidelycookie"]["httponly"] = True
+            return func.HttpResponse('login successful', 
+                                    status_code=200, 
+                                    mimetype="text/plain",
+                                    headers={"Set-Cookie": sc["outsidelycookie"].OutputString()})
+        else:
+            return func.HttpResponse('login unsuccessful', 
+                                    status_code=401, 
+                                    mimetype="text/plain")
+    
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
