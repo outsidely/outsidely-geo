@@ -734,7 +734,7 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
             redirecturl += "&"
         else:
             redirecturl += "?"
-        redirecturl += "token=" + urllib.parse.quote_plus(req.headers.get("Authorization"))
+        redirecturl += "token=" + urllib.parse.quote_plus(req.headers.get("Authorization").replace("Basic ", ""))
         return func.HttpResponse('<html><head><title>Outsidely Login</title></head><body><h1><a href="'+str(redirecturl)+'">Click here to go back</a></h1></body></html>', 
                                  status_code=200, 
                                  mimetype="text/html")

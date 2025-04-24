@@ -12,5 +12,3 @@ geographiclib
 azure-storage-blob
 azure-identity
 azure-data-tables
-http
-urllib
