@@ -1142,7 +1142,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
             case "user":
                 if len(queryEntities("users", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq 'account'")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
-                cjp = checkJsonProperties(body, [{"name":"firstname"},{"name":"lastname"},{"name":"unitsystem"},{"name":"password"}])
+                cjp = checkJsonProperties(body, [{"name":"firstname"},{"name":"lastname"},{"name":"unitsystem"},{"name":"password"},{"name":"email"}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 body["PartitionKey"] = auth["userid"]
