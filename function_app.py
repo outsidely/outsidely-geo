@@ -1155,16 +1155,17 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                     body["salt"] = salt
                 upsertEntity("users", body)
             case "activity":
-                if len(queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
+                qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'", ["gearid", "distance", "activitytype"])
+                if len(qe) == 0:
                     return createJsonHttpResponse(404, "resource not found")
                 cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"description"},{"name":"visibilitytype","validate":True},{"name":"gearid"}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 if len(body.get("gearid",""))>0:
-                    if body.get("activitytype","") == "":
-                        return createJsonHttpResponse(400, "activitytype is required when updating gearid")
-                    if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and name eq '" + body["gearid"] + "' and activitytype eq '" + body["activitytype"] + "'")) == 0:
+                    if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + body["gearid"] + "' and activitytype eq '" + qe[0]["activitytype"] + "'")) == 0:
                         return createJsonHttpResponse(400, "gearid not found")
+                    incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"], False)
+                    incrementDecrement("gear", auth["userid"], body["gearid"], "distance", qe[0]["distance"], False)
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = req.route_params.get("id")
                 upsertEntity("activities", body)
