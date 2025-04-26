@@ -1161,11 +1161,23 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"description"},{"name":"visibilitytype","validate":True},{"name":"gearid"}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
-                if len(body.get("gearid",""))>0:
-                    if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + body["gearid"] + "' and activitytype eq '" + qe[0]["activitytype"] + "'")) == 0:
-                        return createJsonHttpResponse(400, "gearid not found")
-                    incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"], False)
-                    incrementDecrement("gear", auth["userid"], body["gearid"], "distance", qe[0]["distance"], False)
+                if "gearid" in body.keys():
+                    if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + body["gearid"] + "' and activitytype eq '" + qe[0]["activitytype"] + "'")) > 0:
+                        newgearid = body["gearid"]
+                        newgearexists = True
+                    else:
+                        newgearexists = False
+                        body["gearid"] = 'none'
+                    if qe[0].get("gearid") is not None and qe[0].get("gearid") != 'none':
+                        oldgearid = qe[0]["gearid"]
+                        oldgearexists = True
+                    else:
+                        oldgearexists = False
+                    if oldgearid != newgearid:
+                        if oldgearexists:
+                            incrementDecrement("gear", auth["userid"], oldgearid, "distance", -1 * qe[0]["distance"], False)
+                        if newgearexists:
+                            incrementDecrement("gear", auth["userid"], newgearid, "distance", qe[0]["distance"], False)
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = req.route_params.get("id")
                 upsertEntity("activities", body)
