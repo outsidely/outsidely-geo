@@ -80,5 +80,6 @@ jobs:
         with:
           app-name: 'outsidely'
           slot-name: 'Production'
+          remote-build: true
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
           
