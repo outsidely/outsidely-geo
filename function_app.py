@@ -1162,22 +1162,23 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 if "gearid" in body.keys():
+                    newgearid = None
                     if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + body["gearid"] + "' and activitytype eq '" + qe[0]["activitytype"] + "'")) > 0:
                         newgearid = body["gearid"]
                         newgearexists = True
                     else:
                         newgearexists = False
                         body["gearid"] = 'none'
+                    oldgearid = None
                     if qe[0].get("gearid") is not None and qe[0].get("gearid") != 'none':
                         oldgearid = qe[0]["gearid"]
                         oldgearexists = True
                     else:
                         oldgearexists = False
-                    if oldgearid != newgearid:
-                        if oldgearexists:
-                            incrementDecrement("gear", auth["userid"], oldgearid, "distance", -1 * qe[0]["distance"], False)
-                        if newgearexists:
-                            incrementDecrement("gear", auth["userid"], newgearid, "distance", qe[0]["distance"], False)
+                    if oldgearexists:
+                        incrementDecrement("gear", auth["userid"], oldgearid, "distance", -1 * qe[0]["distance"], False)
+                    if newgearexists:
+                        incrementDecrement("gear", auth["userid"], newgearid, "distance", qe[0]["distance"], False)
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = req.route_params.get("id")
                 upsertEntity("activities", body)
