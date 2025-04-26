@@ -248,17 +248,22 @@ def validateData(validationtype, value):
 def authorizer(req):
 
     # cookie method first
-    sc = SimpleCookie()
-    sc.load(req.headers.get("Cookie", ""))
-    if "outsidelycookie" in sc.keys():
-        userid = sc["outsidelycookie"].value.split(":")[0]
-        password = sc["outsidelycookie"].value.split(":")[1]
-        qe = queryEntities("users", "PartitionKey eq '" + userid + "' and password eq '" + password + "'", ["salt", "password", "unitsystem", "timezone"])
-        return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": timezone}
-    
+    # sc = SimpleCookie()
+    # sc.load(req.headers.get("Cookie", ""))
+    # if "outsidelycookie" in sc.keys():
+    #     userid = sc["outsidelycookie"].value.split(":")[0]
+    #     password = sc["outsidelycookie"].value.split(":")[1]
+    #     qe = queryEntities("users", "PartitionKey eq '" + userid + "' and password eq '" + password + "'", ["salt", "password", "unitsystem", "timezone"])
+    #     return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": timezone}
+
+    authorized = False
+    userid = ''
+    unitsystem = 'metric'
+    timezone = 'US/Eastern'
+
     # basic authorization header method second
     try:
-        authorized = False
+        
         parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
         userid = parts[0]
         password = parts[1]
@@ -270,10 +275,7 @@ def authorizer(req):
             unitsystem = qe[0].get("unitsystem", "metric")
             timezone = qe[0].get("timezone", "US/Eastern")
     except:
-        authorized = False
-        userid = ""
-        unitsystem = "metric"
-        timezone = "US/Eastern"
+        none = 1
     return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": timezone}
 
 def checkJsonProperties(json, properties):
@@ -729,13 +731,13 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
         auth = authorizer(req)
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-        redirecturl = req.params.get("redirecturl", "#")
+        redirecturl = req.params.get("redirecturl", "")
         if "?" in redirecturl:
             redirecturl += "&"
         else:
             redirecturl += "?"
         redirecturl += "token=" + urllib.parse.quote_plus(req.headers.get("Authorization").replace("Basic ", ""))
-        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><body><h1><a href="'+str(redirecturl)+'">Click here to go back</a></h1></body></html>', 
+        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><script>window.onload = function() {location.replace("'+str(redirecturl)+'")}</script><body><h1><a href="'+str(redirecturl)+'">Click here to go back</a></h1></body></html>', 
                                  status_code=200, 
                                  mimetype="text/html")
     except Exception as ex:
@@ -1183,7 +1185,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 body["RowKey"] = req.route_params.get("id")
                 upsertEntity("activities", body)
             case "gear":
-                if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "' and geartype eq 'active'")) == 0:
+                if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
                 cjp = checkJsonProperties(body, [{"name":"name"},{"name":"geartype","validate":True}])
                 if not cjp["status"]:
