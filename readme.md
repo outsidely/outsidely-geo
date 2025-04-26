@@ -306,7 +306,6 @@ Request
 ```json
 {
     "name": "name of the piece of gear",
-    "activitytype": "a valid value from /validate/activitytype",
     "geartype": "a valid value from /validate/geartype"
 }
 ```
