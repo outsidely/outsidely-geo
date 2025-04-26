@@ -1185,7 +1185,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
             case "gear":
                 if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "' and geartype eq 'active'")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
-                cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"geartype","validate":True}])
+                cjp = checkJsonProperties(body, [{"name":"name"},{"name":"geartype","validate":True}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 body["PartitionKey"] = auth["userid"]

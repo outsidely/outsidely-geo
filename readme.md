@@ -296,7 +296,8 @@ Request
 {
     "activitytype": "a valid value from /validate/activitytype",
     "name": "name of the activity",
-    "description": "description of the activity"
+    "description": "description of the activity",
+    "gearid": "either 'none' or a valid gearid"
 }
 ```
 
