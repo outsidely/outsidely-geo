@@ -238,6 +238,9 @@ def incrementDecrement(table, partitionkey, rowkey, property, value, integer):
 def tsUnixToIso(ts):
     return datetime.datetime.utcfromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')
 
+def tsIsoToUnix(ts):
+    return parser.isoparse(ts).timestamp()
+
 def validateData(validationtype, value):
     qe = queryEntities("validate","PartitionKey eq '" + validationtype + "' and RowKey eq '" + value + "'")
     if len(qe) == 0:
@@ -737,7 +740,7 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
         else:
             redirecturl += "?"
         redirecturl += "token=" + urllib.parse.quote_plus(req.headers.get("Authorization").replace("Basic ", ""))
-        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><script>window.onload = function() {location.replace("'+str(redirecturl)+'")}</script><body><h1><a href="'+str(redirecturl)+'">Click here to go back</a></h1></body></html>', 
+        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><script>window.onload = function() {location.replace("'+str(redirecturl)+'")}</script><body><h1>Login Successful</h1>If you are not automatically redirected, <a href="'+str(redirecturl)+'">click here</a>< to go back./body></html>', 
                                  status_code=200, 
                                  mimetype="text/html")
     except Exception as ex:
