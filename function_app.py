@@ -238,6 +238,9 @@ def incrementDecrement(table, partitionkey, rowkey, property, value, integer):
 def tsUnixToIso(ts):
     return datetime.datetime.utcfromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')
 
+def tsIsoToUnix(ts):
+    return parser.isoparse(ts).timestamp()
+
 def validateData(validationtype, value):
     qe = queryEntities("validate","PartitionKey eq '" + validationtype + "' and RowKey eq '" + value + "'")
     if len(qe) == 0:
