@@ -441,7 +441,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
 
         # validate gearid
         gearid = str(req.form.get("gearid") or "")
-        if len(gearid) > 0:
+        if len(gearid) > 0 and gearid != "none":
             gearentity = queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + gearid + "' and geartype eq 'active' and activitytype eq '" + activityproperties["activitytype"] + "'")
             if len(gearentity) != 1:
                 return createJsonHttpResponse(400, "invalid gearid")
@@ -495,7 +495,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
         activityproperties["gps"] = 1
 
         # capture distance for gear
-        if len(gearid) > 0:
+        if len(gearid) > 0 and gearid != "none":
             incrementDecrement("gear", auth["userid"], gearid, "distance", activityproperties["distance"], False)
 
         # save statistics to tblsvc
