@@ -146,6 +146,7 @@ Request
     "activitytype": "valide activitytype from validate/activitytypes",
     "ascent": 123.4,
     "descent": 123.4,
+    "distance": 123.4,
     "starttime": "iso 8601 string",
     "time": 312342,
     "description": "string",
