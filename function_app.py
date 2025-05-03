@@ -83,10 +83,10 @@ def parseStatisticsData(activitydata):
         x2 = activitydata[i+1]["longitude"]
         y2 = activitydata[i+1]["latitude"]
         distance += Geodesic.WGS84.Inverse(y1, x1, y2, x2)['s12']
-        if (activitydata[i+1]["elevation"] > activitydata[i]["elevation"]):
-            ascent += activitydata[i+1]["elevation"] - activitydata[i]["elevation"]
+        if (max(activitydata[i+1]["elevation"],0) > max(activitydata[i]["elevation"],0)):
+            ascent += max(activitydata[i+1]["elevation"],0) - max(activitydata[i]["elevation"],0)
         else:
-            descent += activitydata[i]["elevation"] - activitydata[i+1]["elevation"]
+            descent += max(activitydata[i]["elevation"],0) - max(activitydata[i+1]["elevation"],0)
 
     statisticsdata["starttime"] = mintime
     statisticsdata["time"] = time
