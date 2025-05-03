@@ -400,7 +400,7 @@ def whoami(req: func.HttpRequest) -> func.HttpResponse:
         auth = authorizer(req)
         if not auth["authorized"]:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-        return func.HttpResponse(json.dumps({"userid":auth["userid"]}), status_code=200, mimetype="application/json")
+        return func.HttpResponse(json.dumps(auth), status_code=200, mimetype="application/json")
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
