@@ -618,13 +618,13 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             a["media"] = qe
 
             # props
-            qe = queryEntities("props", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey","createtime"], {"RowKey": "userid"}, "createtime", True)
+            qe = queryEntities("props", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey","createtime"], {"RowKey": "userid"}, "createtime")
             for e in qe:
                 e["createtime"] = launderTimezone(e["createtime"], auth["timezone"])
             a["props"] = qe
 
             # comments
-            qe = queryEntities("comments", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey","userid","createtime","comment"], {"RowKey": "commentid"}, "createtime", True)
+            qe = queryEntities("comments", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey","userid","createtime","comment"], {"RowKey": "commentid"}, "createtime")
             for e in qe:
                 e["createtime"] = launderTimezone(e["createtime"], auth["timezone"])
             a["comments"] = qe
