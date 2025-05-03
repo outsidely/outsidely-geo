@@ -381,16 +381,16 @@ def useridIsConnection(userid, connectionuserid):
     else:
         return False
 
-def createNotification(userid, message, options = [], properties = {}):
+def createNotification(userid, message, in_options = [], in_properties = {}):
     notificationid = str(uuid.uuid4())
-    options.append({"text":"Clear", "url":"delete/notification/" + notificationid, "method":"DELETE", "body": None})
+    in_options.append({"text":"Clear", "url":"delete/notification/" + notificationid, "method":"DELETE", "body": None})
     upsertEntity("notifications", {
         "PartitionKey": userid,
         "RowKey": notificationid,
         "message": message,
         "createtime": tsUnixToIso(time.time()),
-        "options": json.dumps(options),
-        "properties": json.dumps(properties)
+        "options": json.dumps(in_options),
+        "properties": json.dumps(in_properties)
     })
 
 @app.route(route="whoami", methods=[func.HttpMethod.GET])
