@@ -957,7 +957,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 cjp = checkJsonProperties(body, [{"name":"activitytype","required":True, "validate": True},{"name":"ascent"},{"name":"descent"},{"name":"distance"},{"name":"starttime","required":True},{"name":"time","required":True},{"name":"description"},{"name":"name","required":True},{"name":"gearid"},{"name":"visibilitytype","validate":True}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
-                if len(body.get("gearid",""))>0:
+                if len(body.get("gearid",""))>0 and body.get("gearid","") != 'none':
                     if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and name eq '" + body["gearid"] + "' and activitytype eq '" + body["activitytype"] + "'")) == 0:
                         return createJsonHttpResponse(400, "gearid not found")
                 activityid = str(uuid.uuid4())
