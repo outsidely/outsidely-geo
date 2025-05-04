@@ -701,8 +701,9 @@ def data(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called data')
     try:
         auth = authorizer(req)
-        if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+        # removing auth requirement for these as they are included inside of pages, and they are generally protected by uuid
+        #if not auth["authorized"]:
+        #    return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
         datatype = req.route_params.get("datatype")
         if not validateData("datatype", datatype)["status"]:
             return createJsonHttpResponse(400, "invalid datatype")
