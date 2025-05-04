@@ -149,7 +149,10 @@ def upsertEntity(table, entity):
 def deleteEntity(table, partitionkey, rowkey):
     tableserviceclient = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
     tableclient = tableserviceclient.get_table_client(table)
-    tableclient.delete_entity(partitionkey, rowkey)
+    try: 
+        tableclient.delete_entity(partitionkey, rowkey)
+    except:
+        donothing = 1
 
 def queryEntities(table, filter, properties = None, aliases = {}, sortproperty = None, sortreverse=False, userid=None, connectionproperty=None):
     table_service_client = TableServiceClient.from_connection_string(os.environ["storageaccount_connectionstring"])
