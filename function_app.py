@@ -864,8 +864,8 @@ def newuser(req: func.HttpRequest) -> func.HttpResponse:
             "RowKey": req.route_params.get("id", ""),
             "connectiontype": "connected"
         })
-        incrementDecrement("users", req.route_params.get("id", ""), 'account', "connections", 1, True)
-        incrementDecrement("users", userid, 'account', "connections", 1, True)
+        #incrementDecrement("users", req.route_params.get("id", ""), 'account', "connections", 1, True)
+        #incrementDecrement("users", userid, 'account', "connections", 1, True)
         createNotification(req.route_params.get("id", ""), "You are now connected to " + userid + ".")
         createNotification(userid, "You are now connected to " + req.route_params.get("id", "") + ".")
 
@@ -1054,8 +1054,6 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                         "RowKey": auth["userid"],
                         "connectiontype": "connected"
                     })
-                    incrementDecrement("users", auth["userid"], 'account', "connections", 1, True)
-                    incrementDecrement("users", body["userid"], 'account', "connections", 1, True)
                     createNotification(auth["userid"], "You are now connected to " + body["userid"] + ".")
                     createNotification(body["userid"], "You are now connected to " + auth["userid"] + ".")
             case "prop":
@@ -1344,8 +1342,6 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 })
                 deleteEntity("connections", auth["userid"], req.route_params.get("id"))
                 deleteEntity("connections", req.route_params.get("id"), auth["userid"])
-                incrementDecrement("users", auth["userid"], "account", "connections", -1, True)
-                incrementDecrement("users", req.route_params.get("id"), "account", "connections", -1, True)
             case "prop":
                 if len(queryEntities("props", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey eq '" + auth["userid"] + "'")) == 0:
                     return createJsonHttpResponse(400, "cannot delete prop")
