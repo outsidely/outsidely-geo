@@ -979,8 +979,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["RowKey"] = activityid
                 body["gps"] = 0
 
-                body = fixtypes(body, {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"})
-                fixtypes = {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"}
+                body = fixTypes(body, {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"})
 
                 upsertEntity("activities", body)
                 id["activityid"] = activityid
@@ -1204,8 +1203,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = req.route_params.get("id")
 
-                body = fixtypes(body, {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"})
-                fixtypes = {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"}
+                body = fixTypes(body, {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"})
 
                 upsertEntity("activities", body)
             case "gear":
