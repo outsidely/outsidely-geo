@@ -319,6 +319,18 @@ def checkJsonProperties(json, properties):
                 message += "invalid " + p["name"] + ": " + json[p["name"]] + "."
     return {"missing": missing, "invalid": invalid, "status": status, "message": message}
 
+def fixTypes(body, fixtypes):
+    for ft in fixtypes:
+        if (ft in body.keys()):
+            match fixtypes[ft]:
+                case "float":
+                    body[ft] = float(body[ft])
+                case "int":
+                    body[ft] = int(body[ft])
+                case "datetime":
+                    body[ft] = parser.isoparse(body["starttime"])
+    return body
+
 def launderUnits(unitsystem, unittype, in_distance = None, in_time = None):
     # time (hh:mm:ss)
     # distance (km) (mi)
@@ -965,17 +977,8 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["RowKey"] = activityid
                 body["gps"] = 0
 
-                # data type forcing
+                body = fixtypes(body, {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"})
                 fixtypes = {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"}
-                for ft in fixtypes:
-                    if (ft in body.keys()):
-                        match fixtypes[ft]:
-                            case "float":
-                                body[ft] = float(body[ft])
-                            case "int":
-                                body[ft] = int(body[ft])
-                            case "datetime":
-                                body[ft] = parser.isoparse(body["starttime"])
 
                 upsertEntity("activities", body)
                 id["activityid"] = activityid
@@ -1198,6 +1201,10 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                         incrementDecrement("gear", auth["userid"], newgearid, "distance", qe[0]["distance"], False)
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = req.route_params.get("id")
+
+                body = fixtypes(body, {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"})
+                fixtypes = {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"}
+
                 upsertEntity("activities", body)
             case "gear":
                 if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
@@ -1297,7 +1304,8 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     return createJsonHttpResponse(404, "resource not found")
                 # gear distance capture change
                 if "gearid" in qe[0].keys():
-                    incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"], False)
+                    if (qe[0]["gearid"] != 'none'):
+                        incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"], False)
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
                     "RowKey": str(uuid.uuid4()),
