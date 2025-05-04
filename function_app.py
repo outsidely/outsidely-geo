@@ -634,14 +634,14 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             a_time = a.get("time",0)
             a_ascent = a.get("ascent",0)
             a_descent = a.get("descent",0)
-            a["time"] = launderUnits(auth["unitsystem"], "time", in_time=a_time)
-            a["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=a_distance)
-            a["ascent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=a_ascent)
-            a["descent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=a_descent)
+            a["time"] = launderUnits(auth["unitsystem"], "time", in_time=float(a_time))
+            a["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=float(a_distance))
+            a["ascent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=float(a_ascent))
+            a["descent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=float(a_descent))
             if a["activitytype"] == "run":
-                a["speed"] = launderUnits(auth["unitsystem"], "pace", in_distance=a_distance, in_time=a_time)
+                a["speed"] = launderUnits(auth["unitsystem"], "pace", in_distance=float(a_distance), in_time=float(a_time))
             else:
-                a["speed"] = launderUnits(auth["unitsystem"], "speed", in_distance=a_distance, in_time=a_time)
+                a["speed"] = launderUnits(auth["unitsystem"], "speed", in_distance=float(a_distance), in_time=float(a_time))
             a["timestamp"] = launderTimezone(a["timestamp"], auth["timezone"])
             a["starttime"] = launderTimezone(a["starttime"], auth["timezone"])
             
@@ -969,7 +969,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 id["activityid"] = activityid
                 # capture distance for gear
                 if len(body.get("gearid",""))>0 and body.get("gearid","") != 'none': 
-                    incrementDecrement("gear", auth["userid"], body["gearid"], "distance", body.get("distance", 0), False)
+                    incrementDecrement("gear", auth["userid"], body["gearid"], "distance", float(body.get("distance", 0)), False)
             case "gear":
                 cjp = checkJsonProperties(body, [{"name":"activitytype","required":True,"validate":True},{"name":"name","required":True}])
                 if not cjp["status"]:
