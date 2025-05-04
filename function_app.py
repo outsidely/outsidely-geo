@@ -964,7 +964,18 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = activityid
                 body["gps"] = 0
-                body["starttime"] = parser.isoparse(body["starttime"])
+
+                # data type forcing
+                fixtypes = {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"}
+                for ft in fixtypes:
+                    match fixtypes[ft]:
+                        case "float":
+                            body[ft] = float(body[ft])
+                        case "int":
+                            body[ft] = int(body[ft])
+                        case "datetime":
+                            body[ft] = parser.isoparse(body["starttime"])
+
                 upsertEntity("activities", body)
                 id["activityid"] = activityid
                 # capture distance for gear
