@@ -1071,7 +1071,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "createtime": tsUnixToIso(time.time())
                 })
                 if req.route_params.get("id") != auth["userid"]:
-                    createNotification(req.route_params.get("id"), auth["userid"] + " gave you props on your activity.", properties={"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
+                    createNotification(req.route_params.get("id"), auth["userid"] + " gave you props on your activity.", in_properties={"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
             case "comment":
                 cjp = checkJsonProperties(body, [{"name":"comment","required":True}])
                 if not cjp["status"]:
@@ -1089,7 +1089,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 })
                 id["commentid"] = commentid
                 if req.route_params.get("id") != auth["userid"]:
-                    createNotification(req.route_params.get("id"), auth["userid"] + " left a comment on your activity.", properties={"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
+                    createNotification(req.route_params.get("id"), auth["userid"] + " left a comment on your activity.", in_properties={"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(201, "create successful", id)
