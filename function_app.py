@@ -968,7 +968,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 upsertEntity("activities", body)
                 id["activityid"] = activityid
                 # capture distance for gear
-                if len(body.get("gearid","")) > 0:
+                if len(body.get("gearid",""))>0 and body.get("gearid","") != 'none': 
                     incrementDecrement("gear", auth["userid"], body["gearid"], "distance", body.get("distance", 0), False)
             case "gear":
                 cjp = checkJsonProperties(body, [{"name":"activitytype","required":True,"validate":True},{"name":"name","required":True}])
