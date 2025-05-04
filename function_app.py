@@ -328,7 +328,9 @@ def fixTypes(body, fixtypes):
                 case "int":
                     body[ft] = int(body[ft])
                 case "datetime":
-                    body[ft] = parser.isoparse(body["starttime"])
+                    body[ft] = parser.isoparse(body[ft])
+                case "string":
+                    body[ft] = str(body[ft])
     return body
 
 def launderUnits(unitsystem, unittype, in_distance = None, in_time = None):
