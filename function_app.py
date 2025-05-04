@@ -1058,8 +1058,8 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                         "RowKey": auth["userid"],
                         "connectiontype": "connected"
                     })
-                    createNotification(auth["userid"], "You are now connected to " + body["userid"] + ".")
-                    createNotification(body["userid"], "You are now connected to " + auth["userid"] + ".")
+                    createNotification(auth["userid"], "You are now connected to " + body["userid"] + ".", in_properties={"userid": body["userid"]})
+                    createNotification(body["userid"], "You are now connected to " + auth["userid"] + ".", in_properties={"userid": auth["userid"]})
             case "prop":
                 if req.route_params.get("id") == auth["userid"]:
                     return createJsonHttpResponse(400, "cannot prop self")
