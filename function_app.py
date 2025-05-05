@@ -398,16 +398,20 @@ def useridIsConnection(userid, connectionuserid):
     else:
         return False
 
-def createNotification(userid, message, in_options = [], in_properties = {}):
+def createNotification(userid, message, options = None, properties = None):
+    if options is None:
+        options = []
+    if properties is None:
+        properties = {}
     notificationid = str(uuid.uuid4())
-    in_options.append({"text":"Clear", "url":"delete/notification/" + notificationid, "method":"DELETE", "body": None})
+    options.append({"text":"Clear", "url":"delete/notification/" + notificationid, "method":"DELETE", "body": None})
     upsertEntity("notifications", {
         "PartitionKey": userid,
         "RowKey": notificationid,
         "message": message,
         "createtime": tsUnixToIso(time.time()),
-        "options": json.dumps(in_options),
-        "properties": json.dumps(in_properties)
+        "options": json.dumps(options),
+        "properties": json.dumps(properties)
     })
 
 @app.route(route="whoami", methods=[func.HttpMethod.GET])
@@ -870,8 +874,8 @@ def newuser(req: func.HttpRequest) -> func.HttpResponse:
         })
         #incrementDecrement("users", req.route_params.get("id", ""), 'account', "connections", 1, True)
         #incrementDecrement("users", userid, 'account', "connections", 1, True)
-        createNotification(req.route_params.get("id", ""), "You are now connected to " + userid + ".")
-        createNotification(userid, "You are now connected to " + req.route_params.get("id", "") + ".")
+        createNotification(req.route_params.get("id", ""), "You are now connected to " + userid + ".", None, None)
+        createNotification(userid, "You are now connected to " + req.route_params.get("id", "") + ".", None, None)
 
         # update invitation as accepted
         upsertEntity("invitations", {
@@ -1043,7 +1047,8 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                         [
                             {"text":"Connect","url":"create/connection","method":"POST","body":"{\"userid\":\"" + auth["userid"] + "\",\"connectiontype\":\"confirmed\"}"},
                             {"text":"Reject","url":"create/connection","method":"POST","body":"{\"userid\":\"" + auth["userid"] + "\",\"connectiontype\":\"rejected\"}"}
-                        ]
+                        ],
+                        None
                     )
 
                 # if both users are confirmed, set to connected
@@ -1058,8 +1063,8 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                         "RowKey": auth["userid"],
                         "connectiontype": "connected"
                     })
-                    createNotification(auth["userid"], "You are now connected to " + body["userid"] + ".", in_properties={"userid": body["userid"]})
-                    createNotification(body["userid"], "You are now connected to " + auth["userid"] + ".", in_properties={"userid": auth["userid"]})
+                    createNotification(auth["userid"], "You are now connected to " + body["userid"] + ".", None, {"userid": body["userid"]})
+                    createNotification(body["userid"], "You are now connected to " + auth["userid"] + ".", None, {"userid": auth["userid"]})
             case "prop":
                 if req.route_params.get("id") == auth["userid"]:
                     return createJsonHttpResponse(400, "cannot prop self")
@@ -1073,7 +1078,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "createtime": tsUnixToIso(time.time())
                 })
                 if req.route_params.get("id") != auth["userid"]:
-                    createNotification(req.route_params.get("id"), auth["userid"] + " gave you props on your activity.", in_properties={"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
+                    createNotification(req.route_params.get("id"), auth["userid"] + " gave you props on your activity.", None, {"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
             case "comment":
                 cjp = checkJsonProperties(body, [{"name":"comment","required":True}])
                 if not cjp["status"]:
@@ -1091,7 +1096,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 })
                 id["commentid"] = commentid
                 if req.route_params.get("id") != auth["userid"]:
-                    createNotification(req.route_params.get("id"), auth["userid"] + " left a comment on your activity.", in_properties={"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
+                    createNotification(req.route_params.get("id"), auth["userid"] + " left a comment on your activity.", None, {"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(201, "create successful", id)
