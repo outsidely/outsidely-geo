@@ -854,7 +854,7 @@ def newuser(req: func.HttpRequest) -> func.HttpResponse:
 
         recoveryid = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
         recoverysalt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
-        body["recoveryid"] = hashlib.sha512(str(recoverysalt + body["recoveryid"]).encode()).hexdigest()
+        body["recoveryid"] = hashlib.sha512(str(recoverysalt + recoveryid).encode()).hexdigest()
         body["recoverysalt"] = recoverysalt
         
         upsertEntity("users", body)
@@ -872,10 +872,8 @@ def newuser(req: func.HttpRequest) -> func.HttpResponse:
             "RowKey": req.route_params.get("id", ""),
             "connectiontype": "connected"
         })
-        #incrementDecrement("users", req.route_params.get("id", ""), 'account', "connections", 1, True)
-        #incrementDecrement("users", userid, 'account', "connections", 1, True)
-        createNotification(req.route_params.get("id", ""), "You are now connected to " + userid + ".", None, None)
-        createNotification(userid, "You are now connected to " + req.route_params.get("id", "") + ".", None, None)
+        createNotification(req.route_params.get("id", ""), "You are now connected to " + userid + ".")
+        createNotification(userid, "You are now connected to " + req.route_params.get("id", "") + ".")
 
         # update invitation as accepted
         upsertEntity("invitations", {
@@ -1296,7 +1294,7 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     for e in queryEntities("deletions", "PartitionKey eq '" + auth["userid"] + "'"):
                         deleteEntity("deletions", e["PartitionKey"], e["RowKey"])
                     # user
-                    deleteEntity("users", auth["userid"])
+                    deleteEntity("users", auth["userid"], 'account')
                     # log
                     upsertEntity("deletions", {
                         "PartitionKey": auth["userid"],
