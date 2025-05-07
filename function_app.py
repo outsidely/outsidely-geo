@@ -1290,6 +1290,9 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     # gear
                     for e in queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "'"):
                         deleteEntity("gear", e["PartitionKey"], e["RowKey"])
+                    # notifications
+                    for e in queryEntities("notifications", "PartitionKey eq '" + auth["userid"] + "'"):
+                        deleteEntity("notifications", e["PartitionKey"], e["RowKey"])
                     # deletions
                     for e in queryEntities("deletions", "PartitionKey eq '" + auth["userid"] + "'"):
                         deleteEntity("deletions", e["PartitionKey"], e["RowKey"])
