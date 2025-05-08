@@ -617,7 +617,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
                 starttime = int(track_timestamp)
                 break
             if ((a.get("visibilitytype", "") != "private") or (a.get("userid") == auth["userid"])):
-                if tsIsoToUnix(a['timestamp']) - tsIsoToUnix(a['starttime']) < delta and not userresponse:
+                if True:
                     activities.append(a)
                     activitycnt += 1
                     track_timestamp = min(track_timestamp, tsIsoToUnix(a['timestamp']))
