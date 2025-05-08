@@ -572,6 +572,8 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         userresponse = False
         filter = ""
 
+        delta = 86400*7
+
         if "activityid" not in req.route_params.keys() and "userid" in req.route_params.keys():
             userresponse = True
 
@@ -581,7 +583,6 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             feedresponse = False
             filter +=  "PartitionKey eq '" + req.route_params.get("userid") + "'" + " and RowKey eq '" + req.route_params.get("activityid") + "'"
         else:
-            delta = 86400*7
             endtime = 0
             starttime = 0
             if "endtime" in req.params.keys() and "starttime" in req.params.keys():
@@ -617,7 +618,8 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
                 starttime = int(track_timestamp)
                 break
             if ((a.get("visibilitytype", "") != "private") or (a.get("userid") == auth["userid"])):
-                if True:
+                # dont show out of sync old stuff if on main feed
+                if (tsIsoToUnix(a['timestamp']) - tsIsoToUnix(a['starttime']) < delta or userresponse) or not feedresponse: 
                     activities.append(a)
                     activitycnt += 1
                     track_timestamp = min(track_timestamp, tsIsoToUnix(a['timestamp']))
