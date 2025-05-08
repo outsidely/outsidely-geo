@@ -390,14 +390,6 @@ def useridExists(userid):
     else:
         return False
 
-def useridIsConnection(userid, connectionuserid):
-    if userid == connectionuserid:
-        return True
-    if len(queryEntities("connections", "PartitionKey eq '" + userid + "' and RowKey eq '" + connectionuserid + "' and connectiontype eq 'connected"))>0:
-        return True
-    else:
-        return False
-
 def createNotification(userid, message, options = None, properties = None):
     if options is None:
         options = []
@@ -577,7 +569,11 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
 
         feedresponse = True
+        userresponse = False
         filter = ""
+
+        if "activityid" not in req.route_params.keys() and "userid" in req.route_params.keys():
+            userresponse = True
 
         if "activityid" in req.route_params.keys() and "userid" not in req.route_params.keys():
             return createJsonHttpResponse(400, "activityid must be accompanied by a userid")
@@ -603,16 +599,28 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         allactivities = queryEntities("activities", 
             filter,
             aliases={"PartitionKey": "userid", "RowKey": "activityid"},
-            sortproperty="starttime", 
+            sortproperty="timestamp", 
             sortreverse=True,
             userid=auth["userid"],
             connectionproperty="PartitionKey")
 
-        # activity privacy
+        # activity privacy, max count
+        # this got a bit complicated
+        # ordering had to be switched to timestamp instead of starttime, which may be confusing in the feed
+        # BUT this is the only way to not drop activities, as there could be diffs in starttime vs timestamp
+        # in full feed, activities >delta are skipped for display to discourage edit spamming to the top of the list
         activities = []
+        activitycnt = 0
+        track_timestamp = 999999999999
         for a in allactivities:
+            if activitycnt == 10: 
+                starttime = int(track_timestamp)
+                break
             if ((a.get("visibilitytype", "") != "private") or (a.get("userid") == auth["userid"])):
-                activities.append(a)
+                if tsIsoToUnix(a['timestamp']) - tsIsoToUnix(a['starttime']) < delta and not userresponse:
+                    activities.append(a)
+                    activitycnt += 1
+                    track_timestamp = min(track_timestamp, tsIsoToUnix(a['timestamp']))
             
         activitytypes = {}
 
