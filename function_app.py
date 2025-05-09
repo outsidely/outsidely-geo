@@ -1191,9 +1191,11 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                     body["salt"] = salt
                 upsertEntity("users", body)
             case "activity":
-                qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'", ["gearid", "distance", "activitytype"])
+                qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'")
                 if len(qe) == 0:
                     return createJsonHttpResponse(404, "resource not found")
+                if time.time()-tsIsoToUnix(qe[0]['timestamp']) > 86400:
+                    return createJsonHttpResponse(400, "activities can only be modified for 24 hours after creation")
                 cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"description"},{"name":"visibilitytype","validate":True},{"name":"gearid"}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
