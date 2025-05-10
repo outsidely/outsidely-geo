@@ -338,7 +338,9 @@ def launderUnits(unitsystem, unittype, in_distance = None, in_time = None):
     # speed (km/hr) (mi/hr)
     # pace min/km (min/mi)
     if unittype == "time":
-        if in_time >= 3600:
+        if in_time >= 86400:
+            return time.strftime('%dd %Hh %Mm', time.gmtime(in_time))
+        elif in_time >= 3600:
             return time.strftime('%Hh %Mm', time.gmtime(in_time))
         else:
             return time.strftime('%Mm %Ss', time.gmtime(in_time))
@@ -401,6 +403,44 @@ def createNotification(userid, message, options = None, properties = None):
         "options": json.dumps(options),
         "properties": json.dumps(properties)
     })
+
+@app.route(route="statistics/{userid}", methods=[func.HttpMethod.GET])
+def statistics(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('called statistics')
+    try:
+
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+        
+        qe = queryEntities("activities", "PartitionKey eq '" + req.route_params.get("userid") + "'", userid=auth["userid"], connectionproperty="PartitionKey")
+        if len(qe) == 0:
+            return createJsonHttpResponse(400, "no statistics found for user")
+
+        count = 0
+        ascent = 0
+        descent = 0
+        distance = 0
+        time = 0
+        for e in qe:
+            if e.get("ascent",0) > 0:
+                ascent += e["ascent"]
+            if e.get("descent",0) > 0:
+                descent += e["descent"]
+            if e.get("distance",0) > 0:
+                distance += e["distance"]
+            if e.get("time",0) > 0:
+                time += e["time"]
+            count += 1
+        response = {}
+        response["count"] = count
+        response["ascent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=ascent)
+        response["descent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=descent)
+        response["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=distance)
+        response["time"] = launderUnits(auth["unitsystem"], "time", in_time=time)
+        return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
 
 @app.route(route="whoami", methods=[func.HttpMethod.GET])
 def whoami(req: func.HttpRequest) -> func.HttpResponse:
