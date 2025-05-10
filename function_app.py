@@ -386,14 +386,6 @@ def useridExists(userid):
     else:
         return False
 
-def useridIsConnection(userid, connectionuserid):
-    if userid == connectionuserid:
-        return True
-    if len(queryEntities("connections", "PartitionKey eq '" + userid + "' and RowKey eq '" + connectionuserid + "' and connectiontype eq 'connected"))>0:
-        return True
-    else:
-        return False
-
 def createNotification(userid, message, options = None, properties = None):
     if options is None:
         options = []
@@ -578,7 +570,13 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
 
         feedresponse = True
+        userresponse = False
         filter = ""
+
+        delta = 86400*7
+
+        if "activityid" not in req.route_params.keys() and "userid" in req.route_params.keys():
+            userresponse = True
 
         if "activityid" in req.route_params.keys() and "userid" not in req.route_params.keys():
             return createJsonHttpResponse(400, "activityid must be accompanied by a userid")
@@ -586,7 +584,6 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             feedresponse = False
             filter +=  "PartitionKey eq '" + req.route_params.get("userid") + "'" + " and RowKey eq '" + req.route_params.get("activityid") + "'"
         else:
-            delta = 86400*7
             endtime = 0
             starttime = 0
             if "endtime" in req.params.keys() and "starttime" in req.params.keys():
@@ -604,16 +601,29 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
         allactivities = queryEntities("activities", 
             filter,
             aliases={"PartitionKey": "userid", "RowKey": "activityid"},
-            sortproperty="starttime", 
+            sortproperty="timestamp", 
             sortreverse=True,
             userid=auth["userid"],
             connectionproperty="PartitionKey")
 
-        # activity privacy
+        # activity privacy, max count
+        # this got a bit complicated
+        # ordering had to be switched to timestamp instead of starttime, which may be confusing in the feed
+        # BUT this is the only way to not drop activities, as there could be diffs in starttime vs timestamp
+        # in full feed, activities >delta are skipped for display to discourage edit spamming to the top of the list
         activities = []
+        activitycnt = 0
+        track_timestamp = 999999999999
         for a in allactivities:
+            if activitycnt == 10: 
+                starttime = int(track_timestamp)
+                break
             if ((a.get("visibilitytype", "") != "private") or (a.get("userid") == auth["userid"])):
-                activities.append(a)
+                # dont show out of sync old stuff if on main feed
+                if (tsIsoToUnix(a['timestamp']) - tsIsoToUnix(a['starttime']) < delta or userresponse) or not feedresponse: 
+                    activities.append(a)
+                    activitycnt += 1
+                    track_timestamp = min(track_timestamp, tsIsoToUnix(a['timestamp']))
             
         activitytypes = {}
 
@@ -855,7 +865,7 @@ def newuser(req: func.HttpRequest) -> func.HttpResponse:
 
         recoveryid = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
         recoverysalt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
-        body["recoveryid"] = hashlib.sha512(str(recoverysalt + body["recoveryid"]).encode()).hexdigest()
+        body["recoveryid"] = hashlib.sha512(str(recoverysalt + recoveryid).encode()).hexdigest()
         body["recoverysalt"] = recoverysalt
         
         upsertEntity("users", body)
@@ -873,10 +883,8 @@ def newuser(req: func.HttpRequest) -> func.HttpResponse:
             "RowKey": req.route_params.get("id", ""),
             "connectiontype": "connected"
         })
-        #incrementDecrement("users", req.route_params.get("id", ""), 'account', "connections", 1, True)
-        #incrementDecrement("users", userid, 'account', "connections", 1, True)
-        createNotification(req.route_params.get("id", ""), "You are now connected to " + userid + ".", None, None)
-        createNotification(userid, "You are now connected to " + req.route_params.get("id", "") + ".", None, None)
+        createNotification(req.route_params.get("id", ""), "You are now connected to " + userid + ".")
+        createNotification(userid, "You are now connected to " + req.route_params.get("id", "") + ".")
 
         # update invitation as accepted
         upsertEntity("invitations", {
@@ -1184,9 +1192,11 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                     body["salt"] = salt
                 upsertEntity("users", body)
             case "activity":
-                qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'", ["gearid", "distance", "activitytype"])
+                qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'")
                 if len(qe) == 0:
                     return createJsonHttpResponse(404, "resource not found")
+                if time.time()-tsIsoToUnix(qe[0]['timestamp']) > 86400:
+                    return createJsonHttpResponse(400, "activities can only be modified for 24 hours after creation")
                 cjp = checkJsonProperties(body, [{"name":"activitytype","validate":True},{"name":"name"},{"name":"description"},{"name":"visibilitytype","validate":True},{"name":"gearid"}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
@@ -1293,11 +1303,14 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                     # gear
                     for e in queryEntities("gear", "PartitionKey eq '" + auth["userid"] + "'"):
                         deleteEntity("gear", e["PartitionKey"], e["RowKey"])
+                    # notifications
+                    for e in queryEntities("notifications", "PartitionKey eq '" + auth["userid"] + "'"):
+                        deleteEntity("notifications", e["PartitionKey"], e["RowKey"])
                     # deletions
                     for e in queryEntities("deletions", "PartitionKey eq '" + auth["userid"] + "'"):
                         deleteEntity("deletions", e["PartitionKey"], e["RowKey"])
                     # user
-                    deleteEntity("users", auth["userid"])
+                    deleteEntity("users", auth["userid"], 'account')
                     # log
                     upsertEntity("deletions", {
                         "PartitionKey": auth["userid"],
