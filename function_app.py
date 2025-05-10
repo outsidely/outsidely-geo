@@ -3,8 +3,6 @@ import os
 import datetime
 import pytz
 import time
-import geopandas
-import pyogrio
 import json
 import uuid
 import base64
@@ -13,17 +11,12 @@ import secrets
 import string
 import math
 import azure.functions as func
+import urllib.parse
 from io import BytesIO
 from dateutil import parser
-from staticmap import *
-from shapely.geometry import LineString
-from geographiclib.geodesic import Geodesic
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient, BlobClient, ContentSettings
-from azure.data.tables import TableServiceClient, TableClient, UpdateMode
-from PIL import Image
-from http.cookies import SimpleCookie
-import urllib.parse
+from azure.storage.blob import BlobServiceClient, ContentSettings
+from azure.data.tables import TableServiceClient
+#from http.cookies import SimpleCookie
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -66,6 +59,8 @@ def parseActivityData(geojson):
     return {"version": 1, "data": activitydata}
 
 def parseStatisticsData(activitydata):
+
+    import geographiclib.geodesic as Geodesic
 
     statisticsdata = {}
 
@@ -378,7 +373,8 @@ def launderTimezone(timestamp, timezone):
     return formattime
 
 def resizeImage(img, size, quality):
-    newimg = Image.open(img)
+    import PIL
+    newimg = PIL.Image.open(img)
     newimg.thumbnail(size)
     outimg = BytesIO()
     newimg.save(outimg, optimize=True, quality=quality, format="JPEG")
@@ -419,6 +415,11 @@ def whoami(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="upload/activity", methods=[func.HttpMethod.POST])
 def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
+
+    import geopandas
+    import pyogrio
+    from staticmap import StaticMap, Line
+    from shapely.geometry import LineString
 
     logging.info('called uploadactivity')
 
@@ -778,42 +779,42 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="login2", methods=[func.HttpMethod.POST])
-def login2(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('called login2')
-    try:
+# @app.route(route="login2", methods=[func.HttpMethod.POST])
+# def login2(req: func.HttpRequest) -> func.HttpResponse:
+#     logging.info('called login2')
+#     try:
 
-        # accepts body of userid and password
-        try:
-            body = req.get_json()
-        except:
-            return createJsonHttpResponse(400, "bad json data")
+#         # accepts body of userid and password
+#         try:
+#             body = req.get_json()
+#         except:
+#             return createJsonHttpResponse(400, "bad json data")
         
-        authorized = False
-        qe = queryEntities("users", "PartitionKey eq '" + body['userid'] + "' and RowKey eq 'account'", ["salt", "password", "unitsystem", "timezone"])
-        if len(qe) > 0:
-            salt = qe[0]["salt"]
-            if hashlib.sha512(str(salt + body['password']).encode()).hexdigest() == qe[0]["password"]:
-                authorized = True
+#         authorized = False
+#         qe = queryEntities("users", "PartitionKey eq '" + body['userid'] + "' and RowKey eq 'account'", ["salt", "password", "unitsystem", "timezone"])
+#         if len(qe) > 0:
+#             salt = qe[0]["salt"]
+#             if hashlib.sha512(str(salt + body['password']).encode()).hexdigest() == qe[0]["password"]:
+#                 authorized = True
 
-        if authorized:
-            # set cookie
-            sc = SimpleCookie()
-            sc["outsidelycookie"] = body['userid'] + ":" + qe[0]["password"]
-            sc["outsidelycookie"]["path"] = "/"
-            sc["outsidelycookie"]["max-age"] = 60*60*24*30
-            sc["outsidelycookie"]["httponly"] = True
-            return func.HttpResponse('login successful', 
-                                    status_code=200, 
-                                    mimetype="text/plain",
-                                    headers={"Set-Cookie": sc["outsidelycookie"].OutputString()})
-        else:
-            return func.HttpResponse('login unsuccessful', 
-                                    status_code=401, 
-                                    mimetype="text/plain")
+#         if authorized:
+#             # set cookie
+#             sc = SimpleCookie()
+#             sc["outsidelycookie"] = body['userid'] + ":" + qe[0]["password"]
+#             sc["outsidelycookie"]["path"] = "/"
+#             sc["outsidelycookie"]["max-age"] = 60*60*24*30
+#             sc["outsidelycookie"]["httponly"] = True
+#             return func.HttpResponse('login successful', 
+#                                     status_code=200, 
+#                                     mimetype="text/plain",
+#                                     headers={"Set-Cookie": sc["outsidelycookie"].OutputString()})
+#         else:
+#             return func.HttpResponse('login unsuccessful', 
+#                                     status_code=401, 
+#                                     mimetype="text/plain")
     
-    except Exception as ex:
-        return createJsonHttpResponse(500, str(ex))
+#     except Exception as ex:
+#         return createJsonHttpResponse(500, str(ex))
 
 @app.route(route="newuser/{id}/{id2}", methods=[func.HttpMethod.POST])
 def newuser(req: func.HttpRequest) -> func.HttpResponse:
