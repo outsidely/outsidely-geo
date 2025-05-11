@@ -17,7 +17,7 @@ from dateutil import parser
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from azure.data.tables import TableServiceClient
 #from http.cookies import SimpleCookie
-
+import geographiclib.geodesic as Geodesic
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 def createJsonHttpResponse(statuscode, message, properties = {}, headers = {}):
@@ -59,8 +59,6 @@ def parseActivityData(geojson):
     return {"version": 1, "data": activitydata}
 
 def parseStatisticsData(activitydata):
-
-    import geographiclib.geodesic as Geodesic
 
     statisticsdata = {}
 
