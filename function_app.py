@@ -256,8 +256,8 @@ def authorizer(req):
 
     try:
 
-        # is there an Authorization header
-        if len(req.headers.get("Authorization", "")) > 0:
+        # is there an Authorization header with a bearer token?
+        if len(req.headers.get("Authorization", "")) > 0 and req.headers.get("Authorization", "").contains("Bearer"):
             data = jwt.decode(req.headers["Authorization"].replace('Bearer ',''), os.environ['secret'], algorithms="HS256")
             qe = queryEntities("users", "PartitionKey eq '" + data["sub"] + "' and RowKey eq 'account'", ["PartitionKey","unitsystem", "timezone"], {"PartitionKey":"userid"})[0]
             if len(qe) > 0:
