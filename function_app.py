@@ -247,22 +247,38 @@ def validateData(validationtype, value):
 
 def authorizer(req):
 
+    import jwt
+
     authorized = False
     userid = ''
     unitsystem = 'metric'
     timezone = 'US/Eastern'
 
     try:
-        parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
-        userid = parts[0]
-        password = parts[1]
-        qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'", ["salt", "password", "unitsystem", "timezone"])
-        if len(qe) > 0:
-            salt = qe[0]["salt"]
-            if hashlib.sha512(str(salt + password).encode()).hexdigest() == qe[0]["password"]:
+
+        # is there an Authorization header
+        if len(req.headers.get("Authorization", "")) > 0:
+            data = jwt.decode(req.headers["Authorization"].replace('Bearer ',''), os.environ['secret'], algorithms="HS256")
+            qe = queryEntities("users", "PartitionKey eq '" + data["sub"] + "' and RowKey eq 'account'", ["PartitionKey","unitsystem", "timezone"], {"PartitionKey":"userid"})[0]
+            if len(qe) > 0:
                 authorized = True
-            unitsystem = qe[0].get("unitsystem", "metric")
-            timezone = qe[0].get("timezone", "US/Eastern")
+                userid = qe["userid"]
+                unitsystem = qe["unitsystem"]
+                timezone = qe["timezone"]
+            if data["exp"] < int(time.time()):
+                authorized = False
+
+        else:
+            parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
+            userid = parts[0]
+            password = parts[1]
+            qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'", ["salt", "password", "unitsystem", "timezone"])
+            if len(qe) > 0:
+                salt = qe[0]["salt"]
+                if hashlib.sha512(str(salt + password).encode()).hexdigest() == qe[0]["password"]:
+                    authorized = True
+                unitsystem = qe[0].get("unitsystem", "metric")
+                timezone = qe[0].get("timezone", "US/Eastern")
     except:
         none = 1
     return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": timezone}
