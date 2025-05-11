@@ -817,6 +817,25 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
+@app.route(route="token", methods=[func.HttpMethod.GET])
+def login(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('called token')
+    try:
+        auth = authorizer(req)
+        if not auth["authorized"]:
+            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+        redirecturl = req.params.get("redirecturl", "")
+        if "?" in redirecturl:
+            redirecturl += "&"
+        else:
+            redirecturl += "?"
+        redirecturl += "token=" + urllib.parse.quote_plus(req.headers.get("Authorization").replace("Basic ", ""))
+        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><script>window.onload = function() {location.replace("'+str(redirecturl)+'")}</script><body><h1>Login Successful</h1>If you are not automatically redirected, <a href="'+str(redirecturl)+'">click here</a>< to go back./body></html>', 
+                                 status_code=200, 
+                                 mimetype="text/html")
+    except Exception as ex:
+        return createJsonHttpResponse(500, str(ex))
+
 # @app.route(route="login2", methods=[func.HttpMethod.POST])
 # def login2(req: func.HttpRequest) -> func.HttpResponse:
 #     logging.info('called login2')
