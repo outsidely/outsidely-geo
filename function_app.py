@@ -257,18 +257,18 @@ def authorizer(req):
     try:
 
         # is there an Authorization header with a bearer token?
-        if len(req.headers.get("Authorization", "")) > 0 and req.headers.get("Authorization", "").contains("Bearer"):
-            data = jwt.decode(req.headers["Authorization"].replace('Bearer ',''), os.environ['secret'], algorithms="HS256")
-            qe = queryEntities("users", "PartitionKey eq '" + data["sub"] + "' and RowKey eq 'account'", ["PartitionKey","unitsystem", "timezone"], {"PartitionKey":"userid"})[0]
-            if len(qe) > 0:
-                authorized = True
-                userid = qe["userid"]
-                unitsystem = qe["unitsystem"]
-                timezone = qe["timezone"]
-            if data["exp"] < int(time.time()):
-                authorized = False
+        # if len(req.headers.get("Authorization", "")) > 0 and req.headers.get("Authorization", "").contains("Bearer"):
+        #     data = jwt.decode(req.headers["Authorization"].replace('Bearer ',''), os.environ['secret'], algorithms="HS256")
+        #     qe = queryEntities("users", "PartitionKey eq '" + data["sub"] + "' and RowKey eq 'account'", ["PartitionKey","unitsystem", "timezone"], {"PartitionKey":"userid"})[0]
+        #     if len(qe) > 0:
+        #         authorized = True
+        #         userid = qe["userid"]
+        #         unitsystem = qe["unitsystem"]
+        #         timezone = qe["timezone"]
+        #     if data["exp"] < int(time.time()):
+        #         authorized = False
 
-        else:
+        # else:
             parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
             userid = parts[0]
             password = parts[1]
