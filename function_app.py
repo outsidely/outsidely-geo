@@ -255,30 +255,15 @@ def authorizer(req):
     timezone = 'US/Eastern'
 
     try:
-
-        # is there an Authorization header with a bearer token?
-        # if len(req.headers.get("Authorization", "")) > 0 and req.headers.get("Authorization", "").contains("Bearer"):
-        #     data = jwt.decode(req.headers["Authorization"].replace('Bearer ',''), os.environ['secret'], algorithms="HS256")
-        #     qe = queryEntities("users", "PartitionKey eq '" + data["sub"] + "' and RowKey eq 'account'", ["PartitionKey","unitsystem", "timezone"], {"PartitionKey":"userid"})[0]
-        #     if len(qe) > 0:
-        #         authorized = True
-        #         userid = qe["userid"]
-        #         unitsystem = qe["unitsystem"]
-        #         timezone = qe["timezone"]
-        #     if data["exp"] < int(time.time()):
-        #         authorized = False
-
-        # else:
-            parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
-            userid = parts[0]
-            password = parts[1]
-            qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'", ["salt", "password", "unitsystem", "timezone"])
-            if len(qe) > 0:
-                salt = qe[0]["salt"]
-                if hashlib.sha512(str(salt + password).encode()).hexdigest() == qe[0]["password"]:
-                    authorized = True
-                unitsystem = qe[0].get("unitsystem", "metric")
-                timezone = qe[0].get("timezone", "US/Eastern")
+        data = jwt.decode(req.headers["Authorization"].replace('Bearer ',''), os.environ['secret'], algorithms="HS256")
+        qe = queryEntities("users", "PartitionKey eq '" + data["sub"] + "' and RowKey eq 'account'", ["PartitionKey","unitsystem", "timezone"], {"PartitionKey":"userid"})[0]
+        if len(qe) > 0:
+            authorized = True
+            userid = qe["userid"]
+            unitsystem = qe["unitsystem"]
+            timezone = qe["timezone"]
+        if data["exp"] < int(time.time()):
+            authorized = False
     except:
         none = 1
     return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": timezone}
@@ -415,7 +400,7 @@ def statistics(req: func.HttpRequest) -> func.HttpResponse:
 
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized")
         
         qe = queryEntities("activities", "PartitionKey eq '" + req.route_params.get("userid") + "'", userid=auth["userid"], connectionproperty="PartitionKey")
         if len(qe) == 0:
@@ -452,7 +437,7 @@ def whoami(req: func.HttpRequest) -> func.HttpResponse:
     try:
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized")
         return func.HttpResponse(json.dumps(auth), status_code=200, mimetype="application/json")
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
@@ -471,7 +456,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
 
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized")
 
         activityid = str(uuid.uuid4())
 
@@ -570,7 +555,7 @@ def uploadmedia(req: func.HttpRequest) -> func.HttpResponse:
     try:
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized")
         activityid = req.route_params.get("activityid")
         if len(queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + activityid + "'")) == 0:
             return createJsonHttpResponse(403, "must be owner of activity to upload media")
@@ -611,7 +596,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
 
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized")
 
         feedresponse = True
         userresponse = False
@@ -760,9 +745,6 @@ def data(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called data')
     try:
         auth = authorizer(req)
-        # removing auth requirement for these as they are included inside of pages, and they are generally protected by uuid
-        #if not auth["authorized"]:
-        #    return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
         datatype = req.route_params.get("datatype")
         if not validateData("datatype", datatype)["status"]:
             return createJsonHttpResponse(400, "invalid datatype")
@@ -796,30 +778,11 @@ def validate(req: func.HttpRequest) -> func.HttpResponse:
     try:
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized")
         if not validateData("validationtype", req.route_params.get("validationtype"))["status"]:
             return createJsonHttpResponse(400, "invalid validationtype")
         data = queryEntities("validate", "PartitionKey eq '" + req.route_params.get("validationtype") + "'",["RowKey","label","sort"],{"RowKey": req.route_params["validationtype"]}, "sort")
         return func.HttpResponse(json.dumps({"validations":data}), status_code=200, mimetype="application/json")
-    except Exception as ex:
-        return createJsonHttpResponse(500, str(ex))
-
-@app.route(route="login", methods=[func.HttpMethod.GET])
-def login(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('called login')
-    try:
-        auth = authorizer(req)
-        if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-        redirecturl = req.params.get("redirecturl", "")
-        if "?" in redirecturl:
-            redirecturl += "&"
-        else:
-            redirecturl += "?"
-        redirecturl += "token=" + urllib.parse.quote_plus(req.headers.get("Authorization").replace("Basic ", ""))
-        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><script>window.onload = function() {location.replace("'+str(redirecturl)+'")}</script><body><h1>Login Successful</h1>If you are not automatically redirected, <a href="'+str(redirecturl)+'">click here</a>< to go back./body></html>', 
-                                 status_code=200, 
-                                 mimetype="text/html")
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
@@ -1005,7 +968,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
     try:
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized")
         try:
             body = req.get_json()
         except:
@@ -1167,7 +1130,7 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
     try:
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized")
         match req.route_params.get("type"):
             case "user":
                 userid = req.route_params.get("id", "")
@@ -1222,7 +1185,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
     try:
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized")
         body = req.get_json()
         match req.route_params.get("type"):
             case "user":
@@ -1318,7 +1281,7 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
     try:
         auth = authorizer(req)
         if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
+            return createJsonHttpResponse(401, "unauthorized")
         match req.route_params.get("type"):
             case "user":
                 if auth["userid"] != req.route_params.get("id"):
