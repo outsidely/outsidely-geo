@@ -16,8 +16,7 @@ from io import BytesIO
 from dateutil import parser
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from azure.data.tables import TableServiceClient
-#from http.cookies import SimpleCookie
-from geographiclib.geodesic import Geodesic
+
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 def createJsonHttpResponse(statuscode, message, properties = {}, headers = {}):
@@ -59,6 +58,8 @@ def parseActivityData(geojson):
     return {"version": 1, "data": activitydata}
 
 def parseStatisticsData(activitydata):
+
+    from geographiclib.geodesic import Geodesic
 
     statisticsdata = {}
 
@@ -246,23 +247,12 @@ def validateData(validationtype, value):
 
 def authorizer(req):
 
-    # cookie method first
-    # sc = SimpleCookie()
-    # sc.load(req.headers.get("Cookie", ""))
-    # if "outsidelycookie" in sc.keys():
-    #     userid = sc["outsidelycookie"].value.split(":")[0]
-    #     password = sc["outsidelycookie"].value.split(":")[1]
-    #     qe = queryEntities("users", "PartitionKey eq '" + userid + "' and password eq '" + password + "'", ["salt", "password", "unitsystem", "timezone"])
-    #     return {"authorized": authorized, "userid": userid, "unitsystem": unitsystem, "timezone": timezone}
-
     authorized = False
     userid = ''
     unitsystem = 'metric'
     timezone = 'US/Eastern'
 
-    # basic authorization header method second
     try:
-        
         parts = base64.b64decode(req.headers.get("Authorization").replace("Basic ", "")).decode().split(":")
         userid = parts[0]
         password = parts[1]
@@ -817,61 +807,46 @@ def login(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
-@app.route(route="token", methods=[func.HttpMethod.GET])
-def login(req: func.HttpRequest) -> func.HttpResponse:
+@app.route(route="token", methods=[func.HttpMethod.POST])
+def token(req: func.HttpRequest) -> func.HttpResponse:
+
+    import jwt
+
     logging.info('called token')
+
     try:
-        auth = authorizer(req)
-        if not auth["authorized"]:
-            return createJsonHttpResponse(401, "unauthorized", headers={'WWW-Authenticate':'Basic realm="outsidely"'})
-        redirecturl = req.params.get("redirecturl", "")
-        if "?" in redirecturl:
-            redirecturl += "&"
+
+        try:
+            body = req.get_json()
+        except:
+            return createJsonHttpResponse(400, "bad json data")
+
+        cjp = checkJsonProperties(body, [{"name": "userid", "required":True},{"name":"password","required":True}])
+        if not cjp["status"]:
+            return createJsonHttpResponse(400, cjp["message"])
+
+        authorized = False
+        userid = body["userid"]
+        password = body["password"]
+        qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'", ["salt", "password"])
+        if len(qe) > 0:
+            salt = qe[0]["salt"]
+            if hashlib.sha512(str(salt + password).encode()).hexdigest() == qe[0]["password"]:
+                authorized = True
+
+        if authorized:
+            exp = int(time.time()) + 30*86400
+            response = {
+                "access_token": jwt.encode({"iss": "outsidely","sub": body["userid"], "exp": exp}, os.environ["secret"], algorithm="HS256"),
+                "token_type": "Bearer",
+                "expires_in": exp
+            }
+            return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
         else:
-            redirecturl += "?"
-        redirecturl += "token=" + urllib.parse.quote_plus(req.headers.get("Authorization").replace("Basic ", ""))
-        return func.HttpResponse('<html><head><title>Outsidely Login</title></head><script>window.onload = function() {location.replace("'+str(redirecturl)+'")}</script><body><h1>Login Successful</h1>If you are not automatically redirected, <a href="'+str(redirecturl)+'">click here</a>< to go back./body></html>', 
-                                 status_code=200, 
-                                 mimetype="text/html")
+            return createJsonHttpResponse(401, "unauthorized")
+
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
-
-# @app.route(route="login2", methods=[func.HttpMethod.POST])
-# def login2(req: func.HttpRequest) -> func.HttpResponse:
-#     logging.info('called login2')
-#     try:
-
-#         # accepts body of userid and password
-#         try:
-#             body = req.get_json()
-#         except:
-#             return createJsonHttpResponse(400, "bad json data")
-        
-#         authorized = False
-#         qe = queryEntities("users", "PartitionKey eq '" + body['userid'] + "' and RowKey eq 'account'", ["salt", "password", "unitsystem", "timezone"])
-#         if len(qe) > 0:
-#             salt = qe[0]["salt"]
-#             if hashlib.sha512(str(salt + body['password']).encode()).hexdigest() == qe[0]["password"]:
-#                 authorized = True
-
-#         if authorized:
-#             # set cookie
-#             sc = SimpleCookie()
-#             sc["outsidelycookie"] = body['userid'] + ":" + qe[0]["password"]
-#             sc["outsidelycookie"]["path"] = "/"
-#             sc["outsidelycookie"]["max-age"] = 60*60*24*30
-#             sc["outsidelycookie"]["httponly"] = True
-#             return func.HttpResponse('login successful', 
-#                                     status_code=200, 
-#                                     mimetype="text/plain",
-#                                     headers={"Set-Cookie": sc["outsidelycookie"].OutputString()})
-#         else:
-#             return func.HttpResponse('login unsuccessful', 
-#                                     status_code=401, 
-#                                     mimetype="text/plain")
-    
-#     except Exception as ex:
-#         return createJsonHttpResponse(500, str(ex))
 
 @app.route(route="newuser/{id}/{id2}", methods=[func.HttpMethod.POST])
 def newuser(req: func.HttpRequest) -> func.HttpResponse:
@@ -882,6 +857,7 @@ def newuser(req: func.HttpRequest) -> func.HttpResponse:
             body = req.get_json()
         except:
             return createJsonHttpResponse(400, "bad json data")
+        
         id = {}
 
         # validate body
