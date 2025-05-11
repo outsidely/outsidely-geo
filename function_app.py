@@ -375,8 +375,8 @@ def launderTimezone(timestamp, timezone):
     return formattime
 
 def resizeImage(img, size, quality):
-    import PIL
-    newimg = PIL.Image.open(img)
+    from PIL import Image
+    newimg = Image.open(img)
     newimg.thumbnail(size)
     outimg = BytesIO()
     newimg.save(outimg, optimize=True, quality=quality, format="JPEG")
