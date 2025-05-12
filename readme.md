@@ -528,37 +528,25 @@ Objects should be in the array ordered by timestamp.
 }
 ```
 
-## Tables / Storage / CRUD Outline
-
-[Google Doc Link](https://docs.google.com/spreadsheets/d/1w3IJKmRbWVmeEW3whp3uNintAZ6bExaaPi4kNrGqgR8/edit?usp=sharing)
-
 ## Work Items
-- Finalize activitytype approach (needs discussion, thought)
-    - gps: 1, 0
-    - assisted: 0, 1
-    - activitytype: run, ride, other
-        - stats happen at this level unless a subtype is requested?
-    - activitysubtype: run, walk, mountain bike, gravel - purely for display?
-- Think through notifications - what triggers them? Comments made, props given, connections post activities, etc.
-- Limiting
-    - Need limits to protect the system: connections, comments, props, gear, invitations, recoveries, media, activities, etc.
-- Bugs or behavioral issues
-    - Quirk: whenever the record is touched, the Timestamp changes. So if someone keeps updating their activity it will always jump to the top. Even if it's mega old. Probably want to implement some sort of check about if it's a lot older than the original posting time then filter it out?
-    - Issue: consider activityid=710e05fd-61c8-456c-be38-5eb90ad1a045 why is the starttime wrong? device issue? 
-    - Activity starttime should probably be localized to where the person performed the activity? or is it just their usual timezone? How does this effect ordering?
-- Long term
-    - Rate limiting for all API calls combined to prevent abuse
-    - Weekly, Monthly, Yearly stat capability
-    - Moving time
-    - Smoothing for elevation
-    - Smoothing for activity distance
-    - Support using DEM-based elevation
-    - Privacy zone support for thumbnails and for detail map
-    - Duplicate activity detection
-    - Support video posting for media
-    - `delete/user` is not really complete. Users can't fully delete themselves because their comments they made on activities not their own are not deleted. There's no way to do so without doing full table scans. Option would be to build a crawling service that just checks every night by long running queries against a list of "find and delete this" in a table.
-    - Split out APIs into more logical functions - for example there should be a service for thumbnail creation so activities don't fail to be created without it succeeding.
-- Reference
-    - useful for smoothing distance https://stackoverflow.com/questions/47068504/where-to-find-python-implementation-of-chaikins-corner-cutting-algorithm
-    - useful for smoothing elevation https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.CubicSpline.html#scipy.interpolate.CubicSpline
-    - useful for reading fit files https://fitdecode.readthedocs.io/en/latest/
+
+### Bugs
+- Issue: consider activityid=710e05fd-61c8-456c-be38-5eb90ad1a045 why is the starttime wrong? device issue? 
+- Activity starttime should be localized to where the person performed the activity, does the GPX data do this? Or not (see above issue)
+
+### Improvements
+- Rate limiting for all API calls combined to prevent abuse
+- Need limits to protect the system: connections, comments, props, gear, invitations, recoveries, media, activities, etc.
+- Weekly, Monthly, Yearly stat capability
+- Moving time
+- Smoothing for elevation
+    - https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.CubicSpline.html#scipy.interpolate.CubicSpline
+- Smoothing for activity distance
+    - https://stackoverflow.com/questions/47068504/where-to-find-python-implementation-of-chaikins-corner-cutting-algorithm
+- Support using DEM-based elevation
+- Privacy zone support for thumbnails and for detail map
+- Duplicate activity detection
+- Support video posting for media
+- Split out APIs into more logical functions - for example there should be a service for thumbnail creation so activities don't fail to be created without it succeeding.
+- Support FIT files
+    - https://fitdecode.readthedocs.io/en/latest/
