@@ -699,10 +699,11 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             a["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=float(a_distance))
             a["ascent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=float(a_ascent))
             a["descent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=float(a_descent))
-            if a["activitytype"] == "run":
-                a["speed"] = launderUnits(auth["unitsystem"], "pace", in_distance=float(a_distance), in_time=float(a_time))
-            else:
+            speedtypes = ["ride","ebike"]
+            if a["activitytype"] in speedtypes:
                 a["speed"] = launderUnits(auth["unitsystem"], "speed", in_distance=float(a_distance), in_time=float(a_time))
+            else:
+                a["speed"] = launderUnits(auth["unitsystem"], "pace", in_distance=float(a_distance), in_time=float(a_time))
             a["timestamp"] = launderTimezone(a["timestamp"], auth["timezone"])
             a["starttime"] = launderTimezone(a["starttime"], auth["timezone"])
             
