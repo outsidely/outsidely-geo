@@ -342,7 +342,10 @@ def launderUnits(unitsystem, unittype, in_distance = None, in_time = None):
             case "speed":
                 return f"{(in_distance/1000)/(in_time/3600):,.1f}" + " km/hr"
             case "pace":
-                pvalue = (in_time/60)/(in_distance/1000)
+                if in_distance or 0 == 0:
+                    pvalue = 0
+                else:
+                    pvalue = (in_time/60)/(in_distance/1000)
                 return str(math.floor(pvalue)) + ":" + (f"{(pvalue - math.floor(pvalue))*60:.0f}").zfill(2) + " min/km"
     elif unitsystem == "imperial":
         match unittype:
@@ -353,7 +356,10 @@ def launderUnits(unitsystem, unittype, in_distance = None, in_time = None):
             case "speed":
                 return f"{(in_distance/1609.34)/(in_time/3600):,.1f}" + " mi/hr"
             case "pace":
-                pvalue = (in_time/60)/(in_distance/1609.34)
+                if in_distance or 0 == 0:
+                    pvalue = 0
+                else:
+                    pvalue = (in_time/60)/(in_distance/1609.34)
                 return str(math.floor(pvalue)) + ":" + (f"{(pvalue - math.floor(pvalue))*60:.0f}").zfill(2) + " min/mi"
     return ""
 
