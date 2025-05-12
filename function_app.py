@@ -342,7 +342,7 @@ def launderUnits(unitsystem, unittype, in_distance = None, in_time = None):
             case "speed":
                 return f"{(in_distance/1000)/(in_time/3600):,.1f}" + " km/hr"
             case "pace":
-                if in_distance or 0 == 0:
+                if in_distance == 0:
                     pvalue = 0
                 else:
                     pvalue = (in_time/60)/(in_distance/1000)
@@ -356,7 +356,7 @@ def launderUnits(unitsystem, unittype, in_distance = None, in_time = None):
             case "speed":
                 return f"{(in_distance/1609.34)/(in_time/3600):,.1f}" + " mi/hr"
             case "pace":
-                if in_distance or 0 == 0:
+                if in_distance == 0:
                     pvalue = 0
                 else:
                     pvalue = (in_time/60)/(in_distance/1609.34)
@@ -707,9 +707,9 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
             a["descent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=float(a_descent))
             speedtypes = ["ride","ebike"]
             if a["activitytype"] in speedtypes:
-                a["speed"] = launderUnits(auth["unitsystem"], "speed", in_distance=float(a_distance), in_time=float(a_time))
+                a["speed"] = launderUnits(auth["unitsystem"], "speed", in_distance=float(a_distance or 0), in_time=float(a_time))
             else:
-                a["speed"] = launderUnits(auth["unitsystem"], "pace", in_distance=float(a_distance), in_time=float(a_time))
+                a["speed"] = launderUnits(auth["unitsystem"], "pace", in_distance=float(a_distance or 0), in_time=float(a_time))
             a["timestamp"] = launderTimezone(a["timestamp"], auth["timezone"])
             a["starttime"] = launderTimezone(a["starttime"], auth["timezone"])
             
