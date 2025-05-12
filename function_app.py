@@ -805,7 +805,7 @@ def token(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(400, cjp["message"])
 
         authorized = False
-        userid = body["userid"]
+        userid = body["userid"].lower()
         password = body["password"]
         qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'", ["salt", "password"])
         if len(qe) > 0:
@@ -815,7 +815,7 @@ def token(req: func.HttpRequest) -> func.HttpResponse:
 
         if authorized:
             response = {
-                "access_token": jwt.encode({"iss": "outsidely","sub": body["userid"], "exp": int(time.time()) + 30*86400}, os.environ["secret"], algorithm="HS256"),
+                "access_token": jwt.encode({"iss": "outsidely","sub": userid, "exp": int(time.time()) + 30*86400}, os.environ["secret"], algorithm="HS256"),
                 "token_type": "Bearer",
                 "expires_in": 30*86400
             }
