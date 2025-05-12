@@ -27,8 +27,8 @@ Response
 
 ### POST /upload/activity
 - Upload a GPX of an activity using multi part form data
-- Required: upload (GPX as binary file), activitytype
-- Optional: name, description, visibilitytype (default='connections')
+- Required: upload (GPX as binary file), activitytype, name
+- Optional: description, visibilitytype (default='connections')
 
 Response 
 ```json

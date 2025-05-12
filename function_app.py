@@ -1337,7 +1337,7 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 # gear distance capture change
                 if "gearid" in qe[0].keys():
                     if (qe[0]["gearid"] != 'none'):
-                        incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0]["distance"], False)
+                        incrementDecrement("gear", auth["userid"], qe[0]["gearid"], "distance", -1 * qe[0].get("distance", float(0)), False)
                 upsertEntity("deletions", {
                     "PartitionKey": auth["userid"],
                     "RowKey": str(uuid.uuid4()),
