@@ -33,6 +33,7 @@ Response
 ### POST /newuser/{userid}/{invitationid}
 - Fulfills an invitation and new user creation request
 - The `recoveryid` is very important as it represents the _only_ way to recover an account if the password is forgotten, see `recover` API.
+- userid has to be unique and never before used in the system, and it may only contain alphanumeric characters [a-zA-Z0-9]
 
 Request
 ```json
@@ -97,9 +98,10 @@ Response
 
 ### Other CRUD
 
-These all share similar code and routines with customization for some cases (changing password, for example). These will provide access for users, activities, gear, comments, media, and props.
+- These all share similar code and routines with customization for some cases (changing password, for example). These will provide access for users, activities, gear, comments, media, and props.
 
 ### POST /create/gear
+
 Request
 ```json
 {
@@ -107,6 +109,7 @@ Request
     "name": "name of the piece of gear"
 }
 ```
+
 Response
 ```json
 {
@@ -117,7 +120,9 @@ Response
 ```
 
 ### POST /create/connection
-To create a connection, one user must initiate. This is done using connectiontype of "confirmed". The other userid will then be listed as "pending" unless they also "confirm" or they choose to "reject".
+
+- To create a connection, one user must initiate. This is done using connectiontype of "confirmed". The other userid will then be listed as "pending" unless they also "confirm" or they choose to "reject".
+
 Request
 ```json
 {
@@ -126,10 +131,29 @@ Request
 }
 ```
 
+Response
+```json
+{
+    "statuscode": 201, 
+    "message": "create successful"
+}
+```
+
 ### POST /create/prop/{userid}/{activityid}
-No body is required to give props.
+
+Request
+- No body is required to give props.
+
+Response
+```json
+{
+    "statuscode": 201, 
+    "message": "create successful"
+}
+```
 
 ### POST /create/comment/{userid}/{activityid}
+
 Request
 ```json
 {
@@ -137,8 +161,18 @@ Request
 }
 ```
 
+Response
+```json
+{
+    "statuscode": 201, 
+    "message": "create successful", 
+    "commentid": "<commentid>"
+}
+```
+
 ### POST /create/activity
-Create a manual activity without a GPS file.
+
+- Create a manual activity without a GPS file. Time is in seconds. Gearid can be omitted or passed in as "none".
 
 Request
 ```json
@@ -152,19 +186,42 @@ Request
     "description": "string",
     "name": "name",
     "gearid": "valid gearid",
-    "visibilitytype": "validate visibilitytype from validate/visibilitytypes"
+    "visibilitytype": "valid visibilitytype from /validate/visibilitytypes"
+}
+```
+
+Response
+```json
+{
+    "statuscode": 201, 
+    "message": "create successful", 
+    "activityid": "<activityid>"
 }
 ```
 
 ### POST /create/recoveryid
-Creates a new recoveryid for an account - the old one will immediately no longer be valid.
 
-Request
+- Creates a new recoveryid for an account - the old one will immediately no longer be valid.
+
+Response
 ```json
 {
     "statuscode": 201, 
     "message": "create successful", 
     "recoveryid": "<recoveryid>"
+}
+```
+
+### POST /create/invitation
+
+- Invitations are limited to 10 per user per day
+
+Response
+```json
+{
+    "statuscode": 201, 
+    "message": "create successful", 
+    "invitationid": "<invitationid>"
 }
 ```
 
@@ -233,13 +290,17 @@ Response
     "firstname": "Jesse", 
     "lastname": "Amundsen",
     // next three only return for calling user
-    "timezone": "America/New_York", 
+    "timezone": "US/Eastern", 
     "unitsystem": "imperial",
     "email": "fake@email.com"
 }
 ```
 
 ### GET /read/notifications
+
+- Notifications can have options which are actions that can be token for the given notification. All receive a Clear by default.
+- The `properties` object may contain custom properties that help hint at how to respond within an interface. These may be things like activityid's or userid's to generate links.
+
 Response
 ```json
 {
@@ -255,6 +316,9 @@ Response
                     "body": null
                 }
             ],
+            "properties": {
+                "customid": "customvalue"
+            }
             "notificationid": "40465142-e525-4329-955d-c13b634e2c22"
         },
         {
@@ -281,6 +345,7 @@ Response
 ```
 
 ### PATCH /update/user/{userid}
+
 Request
 ```json
 {
@@ -292,6 +357,7 @@ Request
 ```
 
 ### PATCH /update/activity/{activityid}
+
 Request
 ```json
 {
@@ -303,6 +369,7 @@ Request
 ```
 
 ### PATCH /update/gear/{gearid}
+
 Request
 ```json
 {
@@ -312,8 +379,10 @@ Request
 ```
 
 ### PATCH /update/media/{activityid}/{mediaid}
+
+- `sort` is an integer in the range of current sort values for the given activityid, issuing a new sort will _swap_ the `sort` values
+
 Request
-- sort is an integer in the range of current sort values for the given activityid, issuing a new sort will _swap_ the sort values
 ```json
 {
     "sort": 3
@@ -321,6 +390,7 @@ Request
 ```
 
 ### DELETE /delete/activity/{activityid}
+
 Response
 ```json
 {
@@ -330,6 +400,7 @@ Response
 ```
 
 ### DELETE /delete/media/{activityid}/{mediaid}
+
 Response
 ```json
 {
@@ -339,6 +410,7 @@ Response
 ```
 
 ### DELETE /delete/connection/{userid}
+
 Response
 ```json
 {
@@ -348,6 +420,7 @@ Response
 ```
 
 ### DELETE /delete/prop/{activityid}
+
 Response
 ```json
 {
@@ -357,6 +430,7 @@ Response
 ```
 
 ### DELETE /delete/comment/{activityid}/{commentid}
+
 Response
 ```json
 {
@@ -366,6 +440,7 @@ Response
 ```
 
 ### DELETE /delete/notification/{notificationid}
+
 Response
 ```json
 {
@@ -375,12 +450,16 @@ Response
 ```
 
 ### GET /whoami
+
 Returns information about the current user context.
 
 Response
 ```json
 {
-    "userid":"jamund"
+    "userid":"jamund",
+    "unitsystem": "imperial",
+    "authorized": true,
+    "timezone": "US/Eastern"
 }
 ```
 

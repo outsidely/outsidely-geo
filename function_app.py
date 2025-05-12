@@ -814,11 +814,10 @@ def token(req: func.HttpRequest) -> func.HttpResponse:
                 authorized = True
 
         if authorized:
-            exp = int(time.time()) + 30*86400
             response = {
-                "access_token": jwt.encode({"iss": "outsidely","sub": body["userid"], "exp": exp}, os.environ["secret"], algorithm="HS256"),
+                "access_token": jwt.encode({"iss": "outsidely","sub": body["userid"], "exp": int(time.time()) + 30*86400}, os.environ["secret"], algorithm="HS256"),
                 "token_type": "Bearer",
-                "expires_in": exp
+                "expires_in": 30*86400
             }
             return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
         else:
