@@ -4,6 +4,27 @@ GIS, data analysis, and APIs for the outsidely project. Utilizes Azure Functions
 
 ## APIs
 
+### POST /token
+- Generate a JWT to use for authorizing requests to the API
+- All requests to the API must be sent with a header with name `Authorization` and a value of `<token_type> <access_token>`
+
+Request
+```json
+{
+    "userid": "<userid>",
+    "password": "<password>"
+}
+```
+
+Response 
+```json
+{
+    "expires_in": 2592000,
+    "token_type": "Bearer",
+    "access_token": "<jwt>"
+}
+```
+
 ### POST /upload/activity
 - Upload a GPX of an activity using multi part form data
 - Required: upload (GPX as binary file), activitytype
