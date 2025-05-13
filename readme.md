@@ -530,23 +530,4 @@ Objects should be in the array ordered by timestamp.
 
 ## Work Items
 
-### Bugs
-- Issue: consider activityid=710e05fd-61c8-456c-be38-5eb90ad1a045 why is the starttime wrong? device issue? 
-- Activity starttime should be localized to where the person performed the activity, does the GPX data do this? Or not (see above issue)
-
-### Improvements
-- Rate limiting for all API calls combined to prevent abuse
-- Need limits to protect the system: connections, comments, props, gear, invitations, recoveries, media, activities, etc.
-- Weekly, Monthly, Yearly stat capability
-- Moving time
-- Smoothing for elevation
-    - https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.CubicSpline.html#scipy.interpolate.CubicSpline
-- Smoothing for activity distance
-    - https://stackoverflow.com/questions/47068504/where-to-find-python-implementation-of-chaikins-corner-cutting-algorithm
-- Support using DEM-based elevation
-- Privacy zone support for thumbnails and for detail map
-- Duplicate activity detection
-- Support video posting for media
-- Split out APIs into more logical functions - for example there should be a service for thumbnail creation so activities don't fail to be created without it succeeding.
-- Support FIT files
-    - https://fitdecode.readthedocs.io/en/latest/
+Moved to: https://github.com/orgs/outsidely/projects/3
