@@ -51,7 +51,7 @@ def parseActivityData(geojson):
             except:
                 raise Exception("Could not parse timestamp, longitude, or latitude which are required")
             try:
-                properties["elevation"] = feature["properties"]["ele"]
+                properties["elevation"] = max(feature["properties"]["ele"],0)
             except:
                 ex = True
             activitydata.append(properties)
@@ -77,10 +77,10 @@ def parseStatisticsData(activitydata):
         x2 = activitydata[i+1]["longitude"]
         y2 = activitydata[i+1]["latitude"]
         distance += Geodesic.WGS84.Inverse(y1, x1, y2, x2)['s12']
-        if (max(activitydata[i+1]["elevation"],0) > max(activitydata[i]["elevation"],0)):
-            ascent += max(activitydata[i+1]["elevation"],0) - max(activitydata[i]["elevation"],0)
+        if (activitydata[i+1]["elevation"] > activitydata[i]["elevation"]):
+            ascent += activitydata[i+1]["elevation"] - activitydata[i]["elevation"]
         else:
-            descent += max(activitydata[i]["elevation"],0) - max(activitydata[i+1]["elevation"],0)
+            descent += activitydata[i]["elevation"] - activitydata[i+1]["elevation"]
 
     statisticsdata["starttime"] = mintime
     statisticsdata["time"] = time
