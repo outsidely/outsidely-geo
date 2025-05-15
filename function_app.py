@@ -557,7 +557,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
             incrementDecrement("gear", auth["userid"], gearid, "distance", activityproperties["distance"], False)
 
         # save statistics to tblsvc
-        activityproperties = fixTypes(activityproperties, {"name":"string","description":"string","time":"int","distance":"float","ascent":"float","descent":"float","starttime":"datetime","gps":"int"})
+        activityproperties = fixTypes(activityproperties, {"name":"string","description":"string","time":"int","distance":"float","ascent":"float","descent":"float","gps":"int"})
         activityproperties = escapeHtml(activityproperties, ["name", "description"])
         upsertEntity("activities", activityproperties)
         
@@ -1026,7 +1026,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["RowKey"] = activityid
                 body["gps"] = 0
 
-                body = fixTypes(body, {"name":"string","description":"string","ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float","gps":"int"})
+                body = fixTypes(body, {"name":"string","description":"string","ascent": "float","descent":"float","distance":"float","time": "int","gps":"int"})
                 body = escapeHtml(body, ["name", "description"])
                 upsertEntity("activities", body)
                 id["activityid"] = activityid
