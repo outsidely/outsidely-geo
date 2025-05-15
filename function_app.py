@@ -10,6 +10,7 @@ import hashlib
 import secrets
 import string
 import math
+import html
 import azure.functions as func
 import urllib.parse
 from io import BytesIO
@@ -17,7 +18,7 @@ from dateutil import parser
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from azure.data.tables import TableServiceClient
 
-app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
+app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)\
 
 def createJsonHttpResponse(statuscode, message, properties = {}, headers = {}):
     response = {}
@@ -399,6 +400,12 @@ def createNotification(userid, message, options = None, properties = None):
         "properties": json.dumps(properties)
     })
 
+def escapeHtml(obj, properties):
+    for p in properties:
+        if p in obj:
+            obj[p] = html.escape(obj[p])
+    return obj
+
 @app.route(route="statistics/{userid}", methods=[func.HttpMethod.GET])
 def statistics(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('called statistics')
@@ -548,6 +555,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
             incrementDecrement("gear", auth["userid"], gearid, "distance", activityproperties["distance"], False)
 
         # save statistics to tblsvc
+        activityproperties = escapeHtml(activityproperties, ["name", "description"])
         upsertEntity("activities", activityproperties)
         
         return createJsonHttpResponse(201, "successfully uploaded activity", {"activityid": activityid})
@@ -886,6 +894,7 @@ def newuser(req: func.HttpRequest) -> func.HttpResponse:
         body["recoveryid"] = hashlib.sha512(str(recoverysalt + recoveryid).encode()).hexdigest()
         body["recoverysalt"] = recoverysalt
         
+        body = escapeHtml(body, ["firstname","lastname"])
         upsertEntity("users", body)
         id["userid"] = userid
         id["recoveryid"] = recoveryid
@@ -1016,6 +1025,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
 
                 body = fixTypes(body, {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"})
 
+                body = escapeHtml(body, ["name", "description"])
                 upsertEntity("activities", body)
                 id["activityid"] = activityid
                 # capture distance for gear
@@ -1033,6 +1043,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["distance"] = float(0)
                 body["geartype"] = str("active")
                 body["createtime"] = tsUnixToIso(time.time())
+                body = escapeHtml(body, ["name"])
                 upsertEntity("gear", body)
                 id["gearid"] = gearid
             case "connection":
@@ -1118,7 +1129,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "PartitionKey": req.route_params.get("id2"),
                     "RowKey": commentid,
                     "userid": auth["userid"],
-                    "comment": body["comment"],
+                    "comment": html.escape(body["comment"]),
                     "createtime": tsUnixToIso(time.time())
                 })
                 id["commentid"] = commentid
@@ -1208,6 +1219,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                     salt = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
                     body["password"] = hashlib.sha512(str(salt + body["password"]).encode()).hexdigest()
                     body["salt"] = salt
+                    body = escapeHtml(body, ["firstname","lastname"])
                 upsertEntity("users", body)
             case "activity":
                 qe = queryEntities("activities", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'")
@@ -1241,6 +1253,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
 
                 body = fixTypes(body, {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"})
 
+                body = escapeHtml(body, ["name","description"])
                 upsertEntity("activities", body)
             case "gear":
                 if len(queryEntities("gear", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
@@ -1250,6 +1263,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                     return createJsonHttpResponse(400, cjp["message"])
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = req.route_params.get("id")
+                body = escapeHtml(body, ["name"])
                 upsertEntity("gear", body)
             case "media":
                 if len(queryEntities("activities", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
