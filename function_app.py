@@ -416,8 +416,6 @@ def statistics(req: func.HttpRequest) -> func.HttpResponse:
             return createJsonHttpResponse(401, "unauthorized")
         
         qe = queryEntities("activities", "PartitionKey eq '" + req.route_params.get("userid") + "'", userid=auth["userid"], connectionproperty="PartitionKey")
-        if len(qe) == 0:
-            return createJsonHttpResponse(400, "no statistics found for user")
 
         count = 0
         ascent = 0
