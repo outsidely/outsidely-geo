@@ -422,6 +422,7 @@ def statistics(req: func.HttpRequest) -> func.HttpResponse:
         descent = 0
         distance = 0
         time = 0
+    
         for e in qe:
             if e.get("ascent",0) > 0:
                 ascent += e["ascent"]
@@ -432,13 +433,16 @@ def statistics(req: func.HttpRequest) -> func.HttpResponse:
             if e.get("time",0) > 0:
                 time += e["time"]
             count += 1
+    
         response = {}
         response["count"] = count
         response["ascent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=ascent)
         response["descent"] = launderUnits(auth["unitsystem"], "ascent", in_distance=descent)
         response["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=distance)
         response["time"] = launderUnits(auth["unitsystem"], "time", in_time=time)
+
         return func.HttpResponse(json.dumps(response), status_code=200, mimetype="application/json")
+    
     except Exception as ex:
         return createJsonHttpResponse(500, str(ex))
 
@@ -553,6 +557,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
             incrementDecrement("gear", auth["userid"], gearid, "distance", activityproperties["distance"], False)
 
         # save statistics to tblsvc
+        activityproperties = fixTypes(activityproperties, {"name":"string","description":"string","time":"int","distance":"float","ascent":"float","descent":"float","starttime":"datetime","gps":"int"})
         activityproperties = escapeHtml(activityproperties, ["name", "description"])
         upsertEntity("activities", activityproperties)
         
@@ -1021,8 +1026,7 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 body["RowKey"] = activityid
                 body["gps"] = 0
 
-                body = fixTypes(body, {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"})
-
+                body = fixTypes(body, {"name":"string","description":"string","ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float","gps":"int"})
                 body = escapeHtml(body, ["name", "description"])
                 upsertEntity("activities", body)
                 id["activityid"] = activityid
@@ -1249,8 +1253,6 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = req.route_params.get("id")
 
-                body = fixTypes(body, {"ascent": "float","descent":"float","distance":"float","starttime":"datetime","time": "float"})
-
                 body = escapeHtml(body, ["name","description"])
                 upsertEntity("activities", body)
             case "gear":
@@ -1274,7 +1276,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                 cjp = checkJsonProperties(body, [{"name":"sort"}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
-                oldsort = qe[0].get("sort")
+                oldsort = int(qe[0].get("sort"))
                 qe = queryEntities("media", "PartitionKey eq '" + req.route_params.get("id") + "' and RowKey ne '" + req.route_params.get("id2") + "'", aliases={"PartitionKey":"activityid","RowKey":"mediaid"})
                 for e in qe:
                     if "sort" in body.keys():
