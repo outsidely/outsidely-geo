@@ -689,6 +689,9 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
 
             if gps:
                 a["previewurl"] = "data/preview/" + a["activityid"]
+                a["gps"] = 1
+            else:
+                a["gps"] = 0
 
             # media
             qe = queryEntities("media", "PartitionKey eq '" + a["activityid"] + "'", ["RowKey", "sort"], {"RowKey": "mediaid"}, "sort")
