@@ -737,6 +737,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
                         a["gear"] = qe[0]
                         a["gear"]["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=a["gear"]["distance"])
                 a["trackurl"] = "data/geojson/" + a["activityid"]
+                a["activityurl"] = "data/activity/" + a["activityid"]
 
             # exclude certain properties and customize response based on type
             excludeproperties = ["timestamp","gearid"]
