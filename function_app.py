@@ -281,6 +281,8 @@ def checkJsonProperties(json, properties):
     for k in json.keys():
         if k in propertynames:
             matched.append(k)
+        if json[k] == None:
+            missing.append(k)
     for p in properties:
         if p.get("required",False) and p["name"] not in json.keys():
             missing.append(p["name"])
