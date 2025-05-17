@@ -1249,9 +1249,9 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
                     else:
                         oldgearexists = False
                     if oldgearexists:
-                        incrementDecrement("gear", auth["userid"], oldgearid, "distance", -1 * float(qe.get("distance", 0)), False)
+                        incrementDecrement("gear", auth["userid"], oldgearid, "distance", -1 * float(qe[0].get("distance", 0)), False)
                     if newgearexists:
-                        incrementDecrement("gear", auth["userid"], newgearid, "distance", float(qe.get("distance", 0)), False)
+                        incrementDecrement("gear", auth["userid"], newgearid, "distance", float(qe[0].get("distance", 0)), False)
                 body["PartitionKey"] = auth["userid"]
                 body["RowKey"] = req.route_params.get("id")
 
