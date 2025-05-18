@@ -5,14 +5,12 @@ import pytz
 import time
 import json
 import uuid
-import base64
 import hashlib
 import secrets
 import string
 import math
 import html
 import azure.functions as func
-import urllib.parse
 from io import BytesIO
 from dateutil import parser
 from azure.storage.blob import BlobServiceClient, ContentSettings
@@ -61,6 +59,7 @@ def parseActivityData(geojson):
 def parseStatisticsData(activitydata):
 
     from geographiclib.geodesic import Geodesic
+    import statistics
 
     statisticsdata = {}
 
@@ -71,6 +70,14 @@ def parseStatisticsData(activitydata):
     distance = 0.0
     ascent = 0.0
     descent = 0.0
+
+    # smooth elevation with rolling average
+    smoothing = 10
+    for i in range(len(activitydata)-1):
+        filterdata = []
+        for j in range(max(i - smoothing, 0), min(i + smoothing, len(activitydata)-1)):
+            filterdata.append(activitydata[j]["elevation"])
+        activitydata[i]["elevation"] = round(statistics.mean(filterdata))
 
     for i in range(len(activitydata)-1):
         x1 = activitydata[i]["longitude"]
@@ -737,6 +744,7 @@ def activities(req: func.HttpRequest) -> func.HttpResponse:
                         a["gear"] = qe[0]
                         a["gear"]["distance"] = launderUnits(auth["unitsystem"], "distance", in_distance=a["gear"]["distance"])
                 a["trackurl"] = "data/geojson/" + a["activityid"]
+                a["activityurl"] = "data/activity/" + a["activityid"]
 
             # exclude certain properties and customize response based on type
             excludeproperties = ["timestamp","gearid"]
