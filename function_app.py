@@ -56,40 +56,40 @@ def parseActivityData(geojson):
             activitydata.append(properties)
     return {"version": 1, "data": activitydata}
 
-def parseStatisticsData(activitydata):
+def parseStatisticsData(in_activitydata):
 
     from geographiclib.geodesic import Geodesic
     import statistics
 
-    activitydata = list(activitydata)
+    sactivitydata = list(in_activitydata)
     statisticsdata = {}
 
-    mintime = parser.parse(activitydata[0]["timestamp"])
-    maxtime = parser.parse(activitydata[len(activitydata)-1]["timestamp"])
+    mintime = parser.parse(sactivitydata[0]["timestamp"])
+    maxtime = parser.parse(sactivitydata[len(sactivitydata)-1]["timestamp"])
 
     time = (maxtime - mintime).seconds
     distance = 0.0
     ascent = 0.0
     descent = 0.0
 
-    # smooth elevation with rolling average
     smoothing = int(os.environ["smoothing"])
-    for i in range(len(activitydata)-1):
-        filterdata = []
-        for j in range(max(i - smoothing, 0), min(i + smoothing, len(activitydata)-1)):
-            filterdata.append(activitydata[j]["elevation"])
-        activitydata[i]["elevation"] = round(statistics.mean(filterdata))
+    if smoothing > 0:
+        for i in range(len(sactivitydata)-1):
+            filterdata = []
+            for j in range(max(i - smoothing, 0), min(i + smoothing, len(sactivitydata)-1)):
+                filterdata.append(sactivitydata[j]["elevation"])
+            sactivitydata[i]["elevation"] = round(statistics.mean(filterdata))
 
-    for i in range(len(activitydata)-1):
-        x1 = activitydata[i]["longitude"]
-        y1 = activitydata[i]["latitude"]
-        x2 = activitydata[i+1]["longitude"]
-        y2 = activitydata[i+1]["latitude"]
+    for i in range(len(sactivitydata)-1):
+        x1 = sactivitydata[i]["longitude"]
+        y1 = sactivitydata[i]["latitude"]
+        x2 = sactivitydata[i+1]["longitude"]
+        y2 = sactivitydata[i+1]["latitude"]
         distance += Geodesic.WGS84.Inverse(y1, x1, y2, x2)['s12']
-        if (activitydata[i+1]["elevation"] > activitydata[i]["elevation"]):
-            ascent += activitydata[i+1]["elevation"] - activitydata[i]["elevation"]
+        if (sactivitydata[i+1]["elevation"] > sactivitydata[i]["elevation"]):
+            ascent += sactivitydata[i+1]["elevation"] - sactivitydata[i]["elevation"]
         else:
-            descent += activitydata[i]["elevation"] - activitydata[i+1]["elevation"]
+            descent += sactivitydata[i]["elevation"] - sactivitydata[i+1]["elevation"]
 
     statisticsdata["starttime"] = mintime
     statisticsdata["time"] = time
