@@ -60,8 +60,9 @@ def parseStatisticsData(in_activitydata):
 
     from geographiclib.geodesic import Geodesic
     import statistics
+    import copy
 
-    sactivitydata = list(in_activitydata)
+    sactivitydata = copy.deepcopy(in_activitydata)
     statisticsdata = {}
 
     mintime = parser.parse(sactivitydata[0]["timestamp"])
