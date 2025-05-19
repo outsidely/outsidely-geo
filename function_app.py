@@ -61,6 +61,7 @@ def parseStatisticsData(activitydata):
     from geographiclib.geodesic import Geodesic
     import statistics
 
+    activitydata = list(activitydata)
     statisticsdata = {}
 
     mintime = parser.parse(activitydata[0]["timestamp"])
@@ -72,7 +73,7 @@ def parseStatisticsData(activitydata):
     descent = 0.0
 
     # smooth elevation with rolling average
-    smoothing = 10
+    smoothing = int(os.environ["smoothing"])
     for i in range(len(activitydata)-1):
         filterdata = []
         for j in range(max(i - smoothing, 0), min(i + smoothing, len(activitydata)-1)):
