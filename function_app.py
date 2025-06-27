@@ -535,9 +535,14 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
             for m in messages["record_mesgs"]:
                 ad = {}
                 try:
-                    ad["elevation"] = float(m["enhanced_altitude"]) or float(m["altitude"])
-                    ad["longitude"] = float(m["position_long"]) / ((2^32)/360) # math ain't working
-                    ad["latitude"] = float(m["position_lat"]) / ((2^32)/360) # math ain't working
+                    elevation = 0
+                    if "enhance_altitude" in m:
+                        elevation = float(m["enhance_altitude"])
+                    elif "altitude" in m:
+                        elevation = float(m["altitude"])
+                    ad["elevation"] = elevation
+                    ad["longitude"] = float(m["position_long"]) / 11930465
+                    ad["latitude"] = float(m["position_lat"]) / 11930465
                     ad["timestamp"] = m["timestamp"].isoformat()
                     activitydata["data"].append(ad)
                 except:
