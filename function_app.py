@@ -475,6 +475,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
     import pyogrio
     from staticmap import StaticMap, Line
     from shapely.geometry import LineString
+    from garmin_fit_sdk import Decoder, Stream
 
     logging.info('called uploadactivity')
 
@@ -488,9 +489,12 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
 
         upload = None
         try:
+            extension = req.files["upload"].filename[-3:].lower()
+            if not extension in ["gpx","fit"]:
+                raise
             upload = req.files["upload"].stream.read()
         except:
-            return createJsonHttpResponse(400, "missing upload data of activity (GPX file)")
+            return createJsonHttpResponse(400, "upload must be a GPX or FIT file")
         
         activityproperties = {}
 
@@ -516,13 +520,30 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
                 return createJsonHttpResponse(400, "invalid gearid")
             activityproperties["gearid"] = gearid
 
-        # convert to geojson
-        dataframe = pyogrio.read_dataframe(upload, layer="track_points")
-        geojson = BytesIO()
-        pyogrio.write_dataframe(dataframe, geojson, driver="GeoJSON", layer="track_points")
-
-        # convert to activityModel
-        activitydata = parseActivityData(json.loads(geojson.getvalue().decode()))
+        if extension == "gpx":
+            # convert to geojson
+            dataframe = pyogrio.read_dataframe(upload, layer="track_points")
+            geojson = BytesIO()
+            pyogrio.write_dataframe(dataframe, geojson, driver="GeoJSON", layer="track_points")
+            # convert to activityModel
+            activitydata = parseActivityData(json.loads(geojson.getvalue().decode()))
+        elif extension == "fit":
+            messages, errors = Decoder(Stream.from_bytes_io(BytesIO(upload))).read()
+            activitydata = {}
+            activitydata["version"] = 1
+            activitydata["data"] = []
+            for m in messages["record_mesgs"]:
+                ad = {}
+                try:
+                    ad["elevation"] = float(m["enhanced_altitude"]) or float(m["altitude"])
+                    ad["longitude"] = float(m["position_long"]) / ((2^32)/360) # math ain't working
+                    ad["latitude"] = float(m["position_lat"]) / ((2^32)/360) # math ain't working
+                    ad["timestamp"] = m["timestamp"].isoformat()
+                    activitydata["data"].append(ad)
+                except:
+                    pass
+        else:
+            raise Exception("invalid extension")
         
         # calculate statistics
         statisticsdata = parseStatisticsData(activitydata["data"])
