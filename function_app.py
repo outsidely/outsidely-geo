@@ -1207,7 +1207,7 @@ def read(req: func.HttpRequest) -> func.HttpResponse:
                     return createJsonHttpResponse(404, "userid not found")
                 properties = ["PartitionKey","firstname", "lastname", "connections", "createtime"]
                 if auth["userid"] == userid:
-                    for p in ["unitsystem","timezone","email","recoveryid"]:
+                    for p in ["unitsystem","timezone","email","recoveryid",'ntfy']:
                         properties.append(p)
                 qe = queryEntities("users", 
                                    "PartitionKey eq '" + userid + "' and RowKey eq 'account'", 
@@ -1258,7 +1258,7 @@ def update(req: func.HttpRequest) -> func.HttpResponse:
             case "user":
                 if len(queryEntities("users", "PartitionKey eq '" + auth['userid'] + "' and RowKey eq 'account'")) == 0:
                     return createJsonHttpResponse(404, "resource not found")
-                cjp = checkJsonProperties(body, [{"name":"firstname"},{"name":"lastname"},{"name":"unitsystem"},{"name":"password"},{"name":"email"}])
+                cjp = checkJsonProperties(body, [{"name":"firstname"},{"name":"lastname"},{"name":"unitsystem"},{"name":"password"},{"name":"email"},{"name":"ntfy"}])
                 if not cjp["status"]:
                     return createJsonHttpResponse(400, cjp["message"])
                 body["PartitionKey"] = auth["userid"]
