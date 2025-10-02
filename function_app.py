@@ -410,6 +410,13 @@ def createNotification(userid, message, options = None, properties = None):
         "options": json.dumps(options),
         "properties": json.dumps(properties)
     })
+    qe = queryEntities("users", "PartitionKey eq '" + userid + "' and RowKey eq 'account'", ["ntfy"])[0]
+    if qe.get("ntfy", None) != None:
+        try:
+            import requests
+            requests.post("https://ntfy.sh/" + qe['ntfy'], data=message, timeout=5)
+        except:
+            pass
 
 def escapeHtml(obj, properties):
     for p in properties:
