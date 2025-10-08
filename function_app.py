@@ -1185,6 +1185,12 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                 id["commentid"] = commentid
                 if req.route_params.get("id") != auth["userid"]:
                     createNotification(req.route_params.get("id"), auth["userid"] + " left a comment on your activity.", None, {"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
+                    userids = set()
+                    for e in queryEntities("comments", "PartitionKey eq '" + req.route_params.get("id2") + "'", ["userid"]):
+                        if e.get("userid") != auth["userid"]:
+                            userids.add(e.get("userid"))
+                    for u in userids:
+                        createNotification(u, auth["userid"] + " commented on an activity you also commented on.", None, {"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(201, "create successful", id)
@@ -1470,6 +1476,10 @@ def delete(req: func.HttpRequest) -> func.HttpResponse:
                 })
                 deleteEntity("comments", req.route_params.get("id"), req.route_params.get("id2"))
             case "notification":
+                if req.route_params.get("id").lower() == 'all':
+                    for e in queryEntities("notifications", "PartitionKey eq '" + auth["userid"] + "'", ["RowKey"], {"RowKey":"notificationid"}):
+                        deleteEntity("notifications", auth["userid"], e['notificationid'])
+                    return createJsonHttpResponse(200, "delete successful")
                 if len(queryEntities("notifications", "PartitionKey eq '" + auth["userid"] + "' and RowKey eq '" + req.route_params.get("id") + "'")) == 0:
                     return createJsonHttpResponse(400, "cannot delete notification")
                 upsertEntity("deletions", {
