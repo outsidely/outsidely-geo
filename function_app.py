@@ -16,7 +16,7 @@ from dateutil import parser
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from azure.data.tables import TableServiceClient
 
-app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)\
+app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 def createJsonHttpResponse(statuscode, message, properties = {}, headers = {}):
     response = {}
