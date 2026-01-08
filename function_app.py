@@ -1183,14 +1183,14 @@ def create(req: func.HttpRequest) -> func.HttpResponse:
                     "createtime": tsUnixToIso(time.time())
                 })
                 id["commentid"] = commentid
+                notififyuserids = set()
                 if req.route_params.get("id") != auth["userid"]:
                     createNotification(req.route_params.get("id"), auth["userid"] + " left a comment on your activity.", None, {"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
-                    userids = set()
-                    for e in queryEntities("comments", "PartitionKey eq '" + req.route_params.get("id2") + "'", ["userid"]):
-                        if e.get("userid") != auth["userid"]:
-                            userids.add(e.get("userid"))
-                    for u in userids:
-                        createNotification(u, auth["userid"] + " commented on an activity you also commented on.", None, {"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
+                for e in queryEntities("comments", "PartitionKey eq '" + req.route_params.get("id2") + "'", ["userid"]):
+                    if e.get("userid") != auth["userid"] and e.get("userid") != req.route_params.get("id"):
+                        notififyuserids.add(e.get("userid"))
+                for u in notififyuserids:
+                    createNotification(u, auth["userid"] + " commented on an activity you also commented on.", None, {"userid":req.route_params.get("id"),"activityid":req.route_params.get("id2")})
             case _:
                 return createJsonHttpResponse(404, "invalid resource type")
         return createJsonHttpResponse(201, "create successful", id)
