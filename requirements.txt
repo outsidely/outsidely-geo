@@ -14,4 +14,3 @@ azure-identity
 azure-data-tables
 garmin_fit_sdk
 pillow
-zipfile
