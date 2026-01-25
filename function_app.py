@@ -483,6 +483,7 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
     from staticmap import StaticMap, Line
     from shapely.geometry import LineString
     from garmin_fit_sdk import Decoder, Stream
+    import zipfile
 
     logging.info('called uploadactivity')
 
@@ -496,12 +497,21 @@ def uploadactivity(req: func.HttpRequest) -> func.HttpResponse:
 
         upload = None
         try:
-            extension = req.files["upload"].filename[-3:].lower()
-            if not extension in ["gpx","fit"]:
-                raise
             upload = req.files["upload"].stream.read()
+            if upload is None:
+                raise
+            extension = req.files["upload"].filename.split('.')[-1].lower()
+            if extension == "zip":
+                with zipfile.ZipFile(BytesIO(upload)) as z:
+                    for name in z.namelist():
+                        if name.lower().endswith(".gpx") or name.lower().endswith(".fit"):
+                            upload = z.read(name)
+                            extension = name.split('.')[-1].lower()
+                            break
+            if extension not in ["gpx","fit"]:
+                raise
         except:
-            return createJsonHttpResponse(400, "upload must be a GPX or FIT file")
+            return createJsonHttpResponse(400, "upload must be a GPX, FIT, or ZIP file containing a GPX or ZIP file")
         
         activityproperties = {}
 
